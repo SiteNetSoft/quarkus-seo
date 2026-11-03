@@ -1,7 +1,10 @@
 package org.sitenetsoft.quarkus.seo.deployment;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import jakarta.inject.Singleton;
@@ -17,6 +20,7 @@ import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.vertx.http.deployment.FilterBuildItem;
 import io.quarkus.vertx.http.deployment.NonApplicationRootPathBuildItem;
 import io.quarkus.vertx.http.deployment.RouteBuildItem;
+import io.quarkus.vertx.http.deployment.spi.StaticResourcesBuildItem;
 import io.quarkus.vertx.http.runtime.HandlerType;
 import io.smallrye.config.ConfigValue;
 import io.smallrye.config.SmallRyeConfig;
@@ -59,6 +63,39 @@ class SeoProcessor {
     }
 
     /**
+     * Decide which outputs the extension registers.
+     *
+     * <p>
+     * An output is off when the master switch or its feature switch is off. The sitemap and robots.txt are also off
+     * when the application serves their path itself, as a static file, a JAX-RS resource or a Reactive Route. The
+     * step treats every match on {@code /robots.txt} as owned, whatever the root path. The step logs nothing about
+     * owned paths.
+     *
+     * @param config the build-time configuration
+     * @param index the combined index
+     * @param statics the static resources, absent when the application has none
+     * @return the outputs
+     */
+    @BuildStep
+    SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
+            Optional<StaticResourcesBuildItem> statics) {
+        if (!config.enabled()) {
+            return new SeoOutputsBuildItem(false, false, false, Set.of());
+        }
+        String sitemapPath = SitemapEntryScanner.join(config.sitemap().path().trim(), null);
+        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex());
+        Set<String> owned = new LinkedHashSet<>();
+        for (String path : List.of(sitemapPath, ROBOTS_PATH)) {
+            if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
+                owned.add(path);
+            }
+        }
+        boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
+        boolean robots = config.robots().enabled() && !owned.contains(ROBOTS_PATH);
+        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, owned);
+    }
+
+    /**
      * Register the settings, locale and base URL beans.
      *
      * @param config the build-time configuration
@@ -81,12 +118,12 @@ class SeoProcessor {
      * <p>
      * Qute reads the tag and the namespace from the bean archive index only, so both classes are added as beans.
      *
-     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @return the beans, or null when the meta feature is switched off
      */
     @BuildStep
-    AdditionalBeanBuildItem metaBeans(SeoBuildConfig config) {
-        if (!metaEnabled(config)) {
+    AdditionalBeanBuildItem metaBeans(SeoOutputsBuildItem outputs) {
+        if (!outputs.meta()) {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
@@ -97,50 +134,30 @@ class SeoProcessor {
     }
 
     /**
-     * Tell whether the meta feature is switched on.
-     *
-     * @param config the build-time configuration
-     * @return true when the extension and the meta feature are switched on
-     */
-    static boolean metaEnabled(SeoBuildConfig config) {
-        return config.enabled() && config.meta().enabled();
-    }
-
-    /**
      * Register the filter that writes the {@code X-Robots-Tag} header.
      *
      * @param recorder the recorder
-     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @return the filter at priority 100, or null when the meta feature is switched off
      */
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
-    FilterBuildItem robotsHeaderFilter(SeoRecorder recorder, SeoBuildConfig config) {
-        if (!metaEnabled(config)) {
+    FilterBuildItem robotsHeaderFilter(SeoRecorder recorder, SeoOutputsBuildItem outputs) {
+        if (!outputs.meta()) {
             return null;
         }
         return new FilterBuildItem(recorder.robotsHeaderFilter(), 100);
     }
 
     /**
-     * Tell whether the sitemap feature is switched on.
-     *
-     * @param config the build-time configuration
-     * @return true when the extension and the sitemap feature are switched on
-     */
-    static boolean sitemapEnabled(SeoBuildConfig config) {
-        return config.enabled() && config.sitemap().enabled();
-    }
-
-    /**
      * Register the sitemap writer and the sitemap service.
      *
-     * @param config the build-time configuration
-     * @return the beans, or null when the sitemap feature is switched off
+     * @param outputs the outputs that the extension registers
+     * @return the beans, or null when the extension does not serve the sitemap
      */
     @BuildStep
-    AdditionalBeanBuildItem sitemapBeans(SeoBuildConfig config) {
-        if (!sitemapEnabled(config)) {
+    AdditionalBeanBuildItem sitemapBeans(SeoOutputsBuildItem outputs) {
+        if (!outputs.sitemap()) {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
@@ -152,14 +169,14 @@ class SeoProcessor {
     /**
      * Find the JAX-RS methods annotated with {@code @SitemapEntry}.
      *
-     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @param index the combined index
      * @param entries the producer of the entries
      */
     @BuildStep
-    void sitemapEntries(SeoBuildConfig config, CombinedIndexBuildItem index,
+    void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index,
             BuildProducer<SitemapEntryBuildItem> entries) {
-        if (!sitemapEnabled(config)) {
+        if (!outputs.sitemap()) {
             return;
         }
         for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex())) {
@@ -171,15 +188,15 @@ class SeoProcessor {
      * Record the sitemap entries as a bean.
      *
      * @param recorder the recorder
-     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @param entries the entries found at build time
-     * @return the synthetic bean, or null when the sitemap feature is switched off
+     * @return the synthetic bean, or null when the extension does not serve the sitemap
      */
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
-    SyntheticBeanBuildItem sitemapEntriesBean(SeoRecorder recorder, SeoBuildConfig config,
+    SyntheticBeanBuildItem sitemapEntriesBean(SeoRecorder recorder, SeoOutputsBuildItem outputs,
             List<SitemapEntryBuildItem> entries) {
-        if (!sitemapEnabled(config)) {
+        if (!outputs.sitemap()) {
             return null;
         }
         List<String> paths = new ArrayList<>();
@@ -202,12 +219,14 @@ class SeoProcessor {
      *
      * @param recorder the recorder
      * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @param routes the producer of the routes
      */
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
-    void sitemapRoutes(SeoRecorder recorder, SeoBuildConfig config, BuildProducer<RouteBuildItem> routes) {
-        if (!sitemapEnabled(config)) {
+    void sitemapRoutes(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.sitemap()) {
             return;
         }
         String path = leadingSlash(config.sitemap().path());
@@ -225,24 +244,14 @@ class SeoProcessor {
     }
 
     /**
-     * Tell whether the robots.txt feature is switched on.
-     *
-     * @param config the build-time configuration
-     * @return true when the extension and the robots.txt feature are switched on
-     */
-    static boolean robotsEnabled(SeoBuildConfig config) {
-        return config.enabled() && config.robots().enabled();
-    }
-
-    /**
      * Register the default robots.txt provider.
      *
-     * @param config the build-time configuration
-     * @return the bean, or null when the robots.txt feature is switched off
+     * @param outputs the outputs that the extension registers
+     * @return the bean, or null when the extension does not serve robots.txt
      */
     @BuildStep
-    AdditionalBeanBuildItem robotsBeans(SeoBuildConfig config) {
-        if (!robotsEnabled(config)) {
+    AdditionalBeanBuildItem robotsBeans(SeoOutputsBuildItem outputs) {
+        if (!outputs.robots()) {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
@@ -259,14 +268,15 @@ class SeoProcessor {
      *
      * @param recorder the recorder
      * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
      * @param nonApplicationRootPath the non-application root path build item
      * @param routes the producer of the routes
      */
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
-    void robotsRoute(SeoRecorder recorder, SeoBuildConfig config,
+    void robotsRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
             NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
-        if (!robotsEnabled(config)) {
+        if (!outputs.robots()) {
             return;
         }
         if (config.robots().serveUnderRootPath()) {
