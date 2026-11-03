@@ -40,6 +40,9 @@ public class Seo {
     @Inject
     SeoSettings settings;
 
+    @Inject
+    SeoHeadRenderer renderer;
+
     /**
      * Set the page title. The title template applies to it.
      *
@@ -366,6 +369,15 @@ public class Seo {
      */
     public ResolvedSeo resolve() {
         return resolver.resolve(tag, java, RequestInfo.current(baseUrlResolver, settings));
+    }
+
+    /**
+     * Render the head tags of the current page.
+     *
+     * @return the head tags, one per line
+     */
+    public String head() {
+        return renderer.render(resolve());
     }
 
     /**

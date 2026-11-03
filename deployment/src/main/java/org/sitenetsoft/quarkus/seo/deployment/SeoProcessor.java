@@ -15,15 +15,20 @@ import io.smallrye.config.ConfigValue;
 import io.smallrye.config.SmallRyeConfig;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
+import org.sitenetsoft.quarkus.seo.Seo;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultBaseUrlResolver;
+import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
+import org.sitenetsoft.quarkus.seo.runtime.SeoResolver;
+import org.sitenetsoft.quarkus.seo.runtime.SeoSectionHelperFactory;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSettings;
+import org.sitenetsoft.quarkus.seo.runtime.SeoTemplateExtensions;
 
 /**
- * Registers the SEO feature and, in later tasks, its beans and routes.
+ * Registers the SEO feature, its beans and, in later tasks, its routes.
  */
 class SeoProcessor {
 
@@ -54,6 +59,37 @@ class SeoProcessor {
                 .addBeanClasses(SeoSettings.class, DefaultSeoLocales.class, DefaultBaseUrlResolver.class)
                 .setUnremovable()
                 .build();
+    }
+
+    /**
+     * Register the page bean, the resolver, the head renderer, the seo tag and the seo namespace.
+     *
+     * <p>
+     * Qute reads the tag and the namespace from the bean archive index only, so both classes are added as beans.
+     *
+     * @param config the build-time configuration
+     * @return the beans, or null when the meta feature is switched off
+     */
+    @BuildStep
+    AdditionalBeanBuildItem metaBeans(SeoBuildConfig config) {
+        if (!metaEnabled(config)) {
+            return null;
+        }
+        return AdditionalBeanBuildItem.builder()
+                .addBeanClasses(Seo.class, SeoResolver.class, DefaultSeoHeadRenderer.class,
+                        SeoSectionHelperFactory.class, SeoTemplateExtensions.class)
+                .setUnremovable()
+                .build();
+    }
+
+    /**
+     * Tell whether the meta feature is switched on.
+     *
+     * @param config the build-time configuration
+     * @return true when the extension and the meta feature are switched on
+     */
+    static boolean metaEnabled(SeoBuildConfig config) {
+        return config.enabled() && config.meta().enabled();
     }
 
     /**
