@@ -9,7 +9,8 @@ import org.sitenetsoft.quarkus.seo.runtime.SeoOutputCache;
  * Invalidate the cached sitemap and robots.txt.
  *
  * <p>
- * The methods do nothing when no cache is active.
+ * The methods do nothing when no cache is active. They do not block and are safe on any thread, including a
+ * Vert.x event loop. They never throw.
  */
 @Singleton
 public class SeoCaches {

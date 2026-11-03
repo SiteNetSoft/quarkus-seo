@@ -6,6 +6,8 @@ import java.util.function.Supplier;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import org.jboss.logging.Logger;
+
 import io.quarkus.cache.Cache;
 import io.quarkus.cache.CacheException;
 import io.quarkus.cache.CacheName;
@@ -18,6 +20,8 @@ import io.quarkus.cache.CacheName;
  */
 @Singleton
 public class CacheManagerSeoOutputCache implements SeoOutputCache {
+
+    private static final Logger LOG = Logger.getLogger(CacheManagerSeoOutputCache.class);
 
     private final Cache sitemap;
     private final Cache robots;
@@ -65,13 +69,21 @@ public class CacheManagerSeoOutputCache implements SeoOutputCache {
     }
 
     /**
-     * Remove every entry of a cache.
+     * Remove every entry of a cache without blocking the calling thread.
+     *
+     * <p>
+     * A failure is logged at DEBUG and never reaches the caller.
      *
      * @param cacheName the cache name
      */
     @Override
     public void invalidateAll(String cacheName) {
-        cache(cacheName).invalidateAll().await().indefinitely();
+        try {
+            cache(cacheName).invalidateAll().subscribe().with(ignored -> {
+            }, e -> LOG.debugf(e, "Invalidating cache %s failed", cacheName));
+        } catch (RuntimeException e) {
+            LOG.debugf(e, "Invalidating cache %s failed", cacheName);
+        }
     }
 
     private boolean enabled(String cacheName) {
