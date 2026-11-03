@@ -55,7 +55,7 @@ public class DefaultRobotsTxtProvider implements RobotsTxtProvider {
         addConfiguredGroups(rules);
         addAiGroups(rules);
         if (buildConfig.enabled() && buildConfig.sitemap().enabled()) {
-            rules.sitemaps().add(Urls.absolute(baseUrl, buildConfig.sitemap().path().trim()));
+            rules.sitemaps().add(Urls.absolute(baseUrl, SeoPaths.normalize(buildConfig.sitemap().path())));
         }
         for (RobotsCustomizer customizer : customizers) {
             customizer.customize(rules);

@@ -26,6 +26,14 @@ class RobotsEndpointTest {
     }
 
     @Test
+    void answersGetAndHeadOnly() {
+        given().basePath("").head("/robots.txt").then().statusCode(200);
+        String body = given().basePath("").post("/robots.txt").then().extract().asString();
+        assertThat(given().basePath("").post("/robots.txt").statusCode()).isNotEqualTo(200);
+        assertThat(body).doesNotContain("User-agent");
+    }
+
+    @Test
     void answersNotModifiedForTheSameEtag() {
         String etag = given().basePath("").get("/robots.txt").header("ETag");
         given().basePath("").header("If-None-Match", etag).get("/robots.txt").then().statusCode(304);

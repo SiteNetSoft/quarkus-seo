@@ -120,6 +120,8 @@ class DefaultRobotsTxtProviderTest {
     void sitemapPathIsNormalized() {
         DefaultRobotsTxtProvider provider = provider(new TestConfig().with("sitemap.path", " maps/s.xml "), true);
         assertThat(provider.robotsTxt("https://ex.com/app")).endsWith("Sitemap: https://ex.com/app/maps/s.xml\n");
+        DefaultRobotsTxtProvider slashes = provider(new TestConfig().with("sitemap.path", "//maps//s.xml/"), true);
+        assertThat(slashes.robotsTxt("https://ex.com")).endsWith("Sitemap: https://ex.com/maps/s.xml\n");
     }
 
     @Test

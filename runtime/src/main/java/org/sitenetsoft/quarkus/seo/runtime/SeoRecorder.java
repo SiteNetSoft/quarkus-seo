@@ -1,6 +1,7 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -94,6 +95,15 @@ public class SeoRecorder {
      */
     public Function<Router, Route> getRoute(String path) {
         return router -> router.route(path).method(HttpMethod.GET).method(HttpMethod.HEAD);
+    }
+
+    /**
+     * Create a route customizer that limits a route to GET and HEAD requests.
+     *
+     * @return the route customizer
+     */
+    public Consumer<Route> getAndHead() {
+        return route -> route.method(HttpMethod.GET).method(HttpMethod.HEAD);
     }
 
     /**

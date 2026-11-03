@@ -18,8 +18,7 @@ import io.quarkus.vertx.http.deployment.spi.StaticResourcesBuildItem;
  *
  * <p>
  * The class reads JAX-RS and Reactive Routes annotations by name, so the deployment module needs no REST or
- * Reactive Routes dependency. It does not see the {@code @ApplicationPath} prefix, the {@code quarkus.rest.path}
- * prefix, a {@code @Route} method with no {@code path} or a {@code regex} route.
+ * Reactive Routes dependency. It does not see a {@code @Route} method with no {@code path} or a {@code regex} route.
  */
 final class OwnedPaths {
 
@@ -35,27 +34,30 @@ final class OwnedPaths {
      * Read the JAX-RS resource paths and the Reactive Routes paths of the application.
      *
      * <p>
-     * A method {@code @Path} joins the {@code @Path} of its class. A {@code @Route} path joins the {@code @RouteBase}
-     * path of its class. Interfaces are skipped because REST client interfaces also carry {@code @Path}. A method
-     * {@code @Path} in a class with no {@code @Path} is skipped because a sub-resource has no fixed path.
+     * A method {@code @Path} joins the {@code @Path} of its class, after the JAX-RS prefix. A {@code @Route} path
+     * joins the {@code @RouteBase} path of its class and takes no JAX-RS prefix. Interfaces are skipped because REST
+     * client interfaces also carry {@code @Path}. A method {@code @Path} in a class with no {@code @Path} is skipped
+     * because a sub-resource has no fixed path.
      *
      * @param index the combined index of the application
+     * @param prefix the JAX-RS prefix from {@link RestPaths#prefix}, or an empty string
      * @return the paths with one leading slash and no trailing slash
      */
-    static Set<String> fromIndex(IndexView index) {
+    static Set<String> fromIndex(IndexView index, String prefix) {
         Set<String> paths = new LinkedHashSet<>();
         for (AnnotationInstance annotation : index.getAnnotations(PATH)) {
             AnnotationTarget target = annotation.target();
             if (target.kind() == AnnotationTarget.Kind.CLASS) {
                 ClassInfo type = target.asClass();
                 if (!type.isInterface()) {
-                    paths.add(SitemapEntryScanner.join(annotation.value().asString(), null));
+                    paths.add(SitemapEntryScanner.join(prefix, annotation.value().asString()));
                 }
             } else if (target.kind() == AnnotationTarget.Kind.METHOD) {
                 ClassInfo type = target.asMethod().declaringClass();
                 AnnotationInstance classPath = type.declaredAnnotation(PATH);
                 if (!type.isInterface() && classPath != null) {
-                    paths.add(SitemapEntryScanner.join(classPath.value().asString(), annotation.value().asString()));
+                    paths.add(SitemapEntryScanner.join(prefix,
+                            SitemapEntryScanner.join(classPath.value().asString(), annotation.value().asString())));
                 }
             }
         }

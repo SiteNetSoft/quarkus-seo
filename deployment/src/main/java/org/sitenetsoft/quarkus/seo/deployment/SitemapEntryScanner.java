@@ -17,6 +17,7 @@ import org.jboss.logging.Logger;
 
 import org.sitenetsoft.quarkus.seo.ChangeFrequency;
 import org.sitenetsoft.quarkus.seo.SitemapEntry;
+import org.sitenetsoft.quarkus.seo.runtime.SeoPaths;
 
 /**
  * Find the JAX-RS methods annotated with {@code @SitemapEntry} and check their values.
@@ -36,15 +37,16 @@ final class SitemapEntryScanner {
      * Read every {@code @SitemapEntry} on a {@code GET} method of a class with a {@code @Path}.
      *
      * <p>
-     * The scan ignores {@code @ApplicationPath} and {@code quarkus.rest.path}. It logs a warning for an annotated
-     * method that is not a {@code GET} method or whose class has no {@code @Path}.
+     * Each path starts with the JAX-RS prefix. The scan logs a warning for an annotated method that is not a
+     * {@code GET} method or whose class has no {@code @Path}.
      *
      * @param index the index of the application classes
+     * @param prefix the JAX-RS prefix from {@link RestPaths#prefix}, or an empty string
      * @return the entries sorted by path, one per path
      * @throws IllegalStateException when an entry has an unknown change frequency, a priority outside 0.0 to 1.0
      *         or a path with a template variable
      */
-    static List<SitemapEntryBuildItem> scan(IndexView index) {
+    static List<SitemapEntryBuildItem> scan(IndexView index, String prefix) {
         Map<String, SitemapEntryBuildItem> entries = new LinkedHashMap<>();
         List<String> problems = new ArrayList<>();
         for (AnnotationInstance annotation : index.getAnnotations(SITEMAP_ENTRY)) {
@@ -60,7 +62,8 @@ final class SitemapEntryScanner {
                 continue;
             }
             AnnotationInstance methodPath = method.declaredAnnotation(PATH);
-            String path = join(classPath.value().asString(), methodPath == null ? null : methodPath.value().asString());
+            String path = join(prefix, join(classPath.value().asString(),
+                    methodPath == null ? null : methodPath.value().asString()));
             String changefreq = stringValue(annotation.value("changefreq"));
             double priority = annotation.value("priority") == null ? UNSET_PRIORITY
                     : annotation.value("priority").asDouble();
@@ -87,34 +90,14 @@ final class SitemapEntryScanner {
     }
 
     /**
-     * Join a class path and a method path.
+     * Join two path parts.
      *
-     * @param classPath the value of the class {@code @Path}
-     * @param methodPath the value of the method {@code @Path}, or null when the method has none
+     * @param first the first part, such as the value of the class {@code @Path}, or null
+     * @param second the second part, such as the value of the method {@code @Path}, or null
      * @return the path with one leading slash and no trailing slash, or {@code /} for the root
      */
-    static String join(String classPath, String methodPath) {
-        StringBuilder joined = new StringBuilder();
-        append(joined, classPath);
-        append(joined, methodPath);
-        return joined.length() == 0 ? "/" : joined.toString();
-    }
-
-    private static void append(StringBuilder joined, String part) {
-        if (part == null) {
-            return;
-        }
-        int start = 0;
-        int end = part.length();
-        while (start < end && part.charAt(start) == '/') {
-            start++;
-        }
-        while (end > start && part.charAt(end - 1) == '/') {
-            end--;
-        }
-        if (start < end) {
-            joined.append('/').append(part, start, end);
-        }
+    static String join(String first, String second) {
+        return SeoPaths.normalize((first == null ? "" : first) + "/" + (second == null ? "" : second));
     }
 
     private static String stringValue(AnnotationValue value) {

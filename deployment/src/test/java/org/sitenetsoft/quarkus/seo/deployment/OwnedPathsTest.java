@@ -20,18 +20,23 @@ class OwnedPathsTest {
 
     @Test
     void joinsClassAndMethodPaths() throws IOException {
-        assertThat(OwnedPaths.fromIndex(Index.of(Joined.class))).containsExactlyInAnyOrder("/a", "/a/b");
+        assertThat(OwnedPaths.fromIndex(Index.of(Joined.class), "")).containsExactlyInAnyOrder("/a", "/a/b");
     }
 
     @Test
     void joinsRouteBaseAndRoutePaths() throws IOException {
-        assertThat(OwnedPaths.fromIndex(Index.of(Routes.class))).containsExactlyInAnyOrder("/base/r", "/base/q", "/base/x",
+        assertThat(OwnedPaths.fromIndex(Index.of(Routes.class), "/api")).containsExactlyInAnyOrder("/base/r", "/base/q", "/base/x",
                 "/base/y");
     }
 
     @Test
+    void jaxrsPathsTakeThePrefix() throws IOException {
+        assertThat(OwnedPaths.fromIndex(Index.of(Joined.class), "/api")).containsExactlyInAnyOrder("/api/a", "/api/a/b");
+    }
+
+    @Test
     void skipsInterfaces() throws IOException {
-        assertThat(OwnedPaths.fromIndex(Index.of(Client.class))).isEmpty();
+        assertThat(OwnedPaths.fromIndex(Index.of(Client.class), "")).isEmpty();
     }
 
     @Test

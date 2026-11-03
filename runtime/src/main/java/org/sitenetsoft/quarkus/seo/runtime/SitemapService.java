@@ -98,8 +98,8 @@ public class SitemapService {
             }
             List<String> pageUrls = new ArrayList<>(pages);
             for (int n = 1; n <= pages; n++) {
-                pageUrls.add(Urls.absolute(baseUrl, buildConfig.sitemap().pagePath().replace(PAGE_TOKEN,
-                        Integer.toString(n))));
+                pageUrls.add(Urls.absolute(baseUrl, SeoPaths.normalize(buildConfig.sitemap().pagePath())
+                        .replace(PAGE_TOKEN, Integer.toString(n))));
             }
             return Optional.of(writer.index(pageUrls));
         }

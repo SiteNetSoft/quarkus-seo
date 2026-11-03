@@ -40,6 +40,7 @@ import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoLayers;
+import org.sitenetsoft.quarkus.seo.runtime.SeoPaths;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
 import org.sitenetsoft.quarkus.seo.runtime.SeoResolver;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSectionHelperFactory;
@@ -49,13 +50,14 @@ import org.sitenetsoft.quarkus.seo.runtime.SitemapEntries;
 import org.sitenetsoft.quarkus.seo.runtime.SitemapService;
 
 /**
- * Registers the SEO feature, its beans and, in later tasks, its routes.
+ * Register the SEO feature, its beans and its routes.
  */
 class SeoProcessor {
 
     static final String FEATURE = "seo";
     private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
     private static final String ROBOTS_PATH = "/robots.txt";
+    private static final String REST_PATH = "quarkus.rest.path";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
 
@@ -74,14 +76,15 @@ class SeoProcessor {
      *
      * <p>
      * An output is off when the master switch or its feature switch is off. The sitemap and robots.txt are also off
-     * when the application serves their path itself, as a static file, a JAX-RS resource or a Reactive Route. The
-     * step treats every match on {@code /robots.txt} as owned, whatever the root path. The step logs nothing about
-     * owned paths.
+     * when the application serves their path itself, as a static file, a JAX-RS resource or a Reactive Route. A
+     * JAX-RS path includes the {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every
+     * match on {@code /robots.txt} as owned, whatever the root path. The step logs nothing about owned paths.
      *
      * @param config the build-time configuration
      * @param index the combined index
      * @param statics the static resources, absent when the application has none
      * @return the outputs
+     * @throws IllegalStateException when a sitemap path holds a colon, an asterisk or whitespace
      */
     @BuildStep
     SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
@@ -89,8 +92,12 @@ class SeoProcessor {
         if (!config.enabled()) {
             return new SeoOutputsBuildItem(false, false, false, Set.of());
         }
-        String sitemapPath = SitemapEntryScanner.join(config.sitemap().path().trim(), null);
-        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex());
+        if (config.sitemap().enabled()) {
+            checkPath("quarkus.seo.sitemap.path", config.sitemap().path());
+            checkPath("quarkus.seo.sitemap.page-path", config.sitemap().pagePath());
+        }
+        String sitemapPath = SeoPaths.normalize(config.sitemap().path());
+        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index));
         Set<String> owned = new LinkedHashSet<>();
         for (String path : List.of(sitemapPath, ROBOTS_PATH)) {
             if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
@@ -245,7 +252,7 @@ class SeoProcessor {
         if (!outputs.sitemap()) {
             return;
         }
-        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex())) {
+        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index))) {
             entries.produce(entry);
         }
     }
@@ -295,8 +302,8 @@ class SeoProcessor {
         if (!outputs.sitemap()) {
             return;
         }
-        String path = leadingSlash(config.sitemap().path());
-        String pageRegex = pageRegex(leadingSlash(config.sitemap().pagePath()));
+        String path = SeoPaths.normalize(config.sitemap().path());
+        String pageRegex = pageRegex(SeoPaths.normalize(config.sitemap().pagePath()));
         routes.produce(RouteBuildItem.builder()
                 .routeFunction(recorder.getRoute(path))
                 .handler(recorder.sitemapHandler())
@@ -330,7 +337,8 @@ class SeoProcessor {
      * Register the robots.txt route.
      *
      * <p>
-     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     * The route sits on the host root unless {@code serve-under-root-path} is true. Both routes answer GET and HEAD
+     * only.
      *
      * @param recorder the recorder
      * @param config the build-time configuration
@@ -354,7 +362,7 @@ class SeoProcessor {
             return;
         }
         routes.produce(nonApplicationRootPath.routeBuilder()
-                .route(ROBOTS_PATH)
+                .routeFunction(ROBOTS_PATH, recorder.getAndHead())
                 .handler(recorder.robotsHandler())
                 .handlerType(HandlerType.BLOCKING)
                 .build());
@@ -377,9 +385,36 @@ class SeoProcessor {
                 + Pattern.quote(pagePath.substring(token + PAGE_TOKEN.length()));
     }
 
-    private static String leadingSlash(String path) {
-        String trimmed = path.trim();
-        return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
+    /**
+     * Check that a sitemap path is a plain path.
+     *
+     * <p>
+     * Vert.x reads a colon as a path parameter and an asterisk as a wildcard.
+     *
+     * @param key the configuration key
+     * @param value the configured path
+     * @throws IllegalStateException when the path holds a colon, an asterisk or whitespace
+     */
+    static void checkPath(String key, String value) {
+        String trimmed = value.trim();
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c == ':' || c == '*' || Character.isWhitespace(c)) {
+                throw new IllegalStateException(
+                        key + " must not hold a colon, an asterisk or whitespace: \"" + value + "\"");
+            }
+        }
+    }
+
+    /**
+     * Return the JAX-RS prefix of the application.
+     *
+     * @param index the combined index
+     * @return the prefix, or an empty string for the root
+     */
+    private static String jaxrsPrefix(CombinedIndexBuildItem index) {
+        Optional<String> restPath = ConfigProvider.getConfig().getOptionalValue(REST_PATH, String.class);
+        return RestPaths.prefix(index.getIndex(), restPath);
     }
 
     /**
