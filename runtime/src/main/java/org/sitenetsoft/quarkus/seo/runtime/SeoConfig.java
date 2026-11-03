@@ -25,7 +25,8 @@ public interface SeoConfig {
     Optional<String> siteName();
 
     /**
-     * Set the public base URL of the site. When unset, the request host applies.
+     * Set the public URL of the application root. The URL must hold any public path prefix, because the extension
+     * does not append {@code quarkus.http.root-path} to it. When unset, the request host and the root path apply.
      *
      * @return the site URL
      */

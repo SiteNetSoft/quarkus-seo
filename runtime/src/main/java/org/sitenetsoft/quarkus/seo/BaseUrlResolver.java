@@ -11,10 +11,15 @@ import io.vertx.ext.web.RoutingContext;
 public interface BaseUrlResolver {
 
     /**
-     * Resolve the public base of the application.
+     * Resolve the public URL of the application root.
+     *
+     * <p>
+     * The extension appends paths relative to the root path to this URL. The URL therefore holds the public path
+     * prefix of the application. The default bean returns {@code quarkus.seo.site-url} as it is when that key is
+     * set. Otherwise it returns the request scheme and host followed by {@code quarkus.http.root-path}.
      *
      * @param context the current request
-     * @return the base with no trailing slash, for example {@code https://ex.com} or {@code https://ex.com/app}
+     * @return the URL with no trailing slash, for example {@code https://ex.com} or {@code https://ex.com/app}
      */
     String resolve(RoutingContext context);
 }
