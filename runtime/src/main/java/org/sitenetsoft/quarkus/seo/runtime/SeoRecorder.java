@@ -4,6 +4,10 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.eclipse.microprofile.config.Config;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.jboss.logging.Logger;
+
 import io.quarkus.runtime.annotations.Recorder;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpMethod;
@@ -100,5 +104,23 @@ public class SeoRecorder {
      */
     public Function<Router, Route> getRegexRoute(String regex) {
         return router -> router.routeWithRegex(regex).method(HttpMethod.GET).method(HttpMethod.HEAD);
+    }
+
+    /**
+     * Log once that a cache key is on while {@code quarkus-cache} is absent.
+     *
+     * @param sitemap true when the extension serves the sitemap
+     * @param robots true when the extension serves robots.txt
+     */
+    public void logCacheMissing(boolean sitemap, boolean robots) {
+        Config config = ConfigProvider.getConfig();
+        boolean sitemapCache = sitemap && config.getOptionalValue("quarkus.seo.sitemap.cache.enabled", Boolean.class)
+                .orElse(false);
+        boolean robotsCache = robots && config.getOptionalValue("quarkus.seo.robots.cache.enabled", Boolean.class)
+                .orElse(false);
+        if (sitemapCache || robotsCache) {
+            Logger.getLogger(SeoRecorder.class)
+                    .info("quarkus.seo cache is enabled but quarkus-cache is not present. Serving without a cache.");
+        }
     }
 }

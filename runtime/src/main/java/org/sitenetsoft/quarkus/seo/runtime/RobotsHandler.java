@@ -21,7 +21,9 @@ final class RobotsHandler implements Handler<RoutingContext> {
     @Override
     public void handle(RoutingContext context) {
         String baseUrl = Arc.container().instance(BaseUrlResolver.class).get().resolve(context);
-        String body = Arc.container().instance(RobotsTxtProvider.class).get().robotsTxt(baseUrl);
+        RobotsTxtProvider provider = Arc.container().instance(RobotsTxtProvider.class).get();
+        String body = Arc.container().instance(SeoOutputCache.class).get().get(SeoOutputCache.ROBOTS, baseUrl,
+                () -> provider.robotsTxt(baseUrl));
         String cacheControl = Arc.container().instance(SeoConfig.class).get().sitemap().cacheControl();
         HttpOutputs.send(context, body, CONTENT_TYPE, cacheControl);
     }

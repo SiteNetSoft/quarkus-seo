@@ -12,6 +12,9 @@ import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
+import io.quarkus.deployment.Capabilities;
+import io.quarkus.deployment.Capability;
+import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.ExecutionTime;
@@ -27,11 +30,13 @@ import io.smallrye.config.SmallRyeConfig;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import org.sitenetsoft.quarkus.seo.Seo;
+import org.sitenetsoft.quarkus.seo.SeoCaches;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultBaseUrlResolver;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultRobotsTxtProvider;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
+import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
@@ -48,6 +53,7 @@ import org.sitenetsoft.quarkus.seo.runtime.SitemapService;
 class SeoProcessor {
 
     static final String FEATURE = "seo";
+    private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
     private static final String ROBOTS_PATH = "/robots.txt";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
@@ -147,6 +153,65 @@ class SeoProcessor {
             return null;
         }
         return new FilterBuildItem(recorder.robotsHeaderFilter(), 100);
+    }
+
+    /**
+     * Register the output cache and the invalidation bean.
+     *
+     * <p>
+     * The cache-backed class is named as a string, so the class loader does not load it without
+     * {@code quarkus-cache}. The run-time keys decide whether the bean uses its caches.
+     *
+     * @param outputs the outputs that the extension registers
+     * @param capabilities the capabilities of the application
+     * @param beans the producer of the beans
+     */
+    @BuildStep
+    void cacheBeans(SeoOutputsBuildItem outputs, Capabilities capabilities,
+            BuildProducer<AdditionalBeanBuildItem> beans) {
+        if (!outputs.sitemap() && !outputs.robots()) {
+            return;
+        }
+        beans.produce(AdditionalBeanBuildItem.builder().addBeanClasses(SeoCaches.class).setUnremovable().build());
+        String implementation = capabilities.isPresent(Capability.CACHE) ? CACHE_MANAGER_CLASS
+                : NoSeoOutputCache.class.getName();
+        beans.produce(AdditionalBeanBuildItem.builder().addBeanClasses(implementation).setUnremovable().build());
+    }
+
+    /**
+     * Index the cache-backed class so that the cache extension finds its {@code @CacheName} injection points.
+     *
+     * <p>
+     * The step cannot consume the outputs, because the outputs read the combined index. It reads the build-time
+     * switches instead, which are a superset of the outputs.
+     *
+     * @param config the build-time configuration
+     * @param capabilities the capabilities of the application
+     * @return the indexed class, or null when no cache is possible
+     */
+    @BuildStep
+    AdditionalIndexedClassesBuildItem indexCacheClass(SeoBuildConfig config, Capabilities capabilities) {
+        if (!capabilities.isPresent(Capability.CACHE) || !config.enabled()
+                || !(config.sitemap().enabled() || config.robots().enabled())) {
+            return null;
+        }
+        return new AdditionalIndexedClassesBuildItem(CACHE_MANAGER_CLASS);
+    }
+
+    /**
+     * Log once at start when a cache key is on and {@code quarkus-cache} is absent.
+     *
+     * @param recorder the recorder
+     * @param outputs the outputs that the extension registers
+     * @param capabilities the capabilities of the application
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void logCacheMissing(SeoRecorder recorder, SeoOutputsBuildItem outputs, Capabilities capabilities) {
+        if (capabilities.isPresent(Capability.CACHE) || (!outputs.sitemap() && !outputs.robots())) {
+            return;
+        }
+        recorder.logCacheMissing(outputs.sitemap(), outputs.robots());
     }
 
     /**

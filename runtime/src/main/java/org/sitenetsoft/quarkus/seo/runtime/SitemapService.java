@@ -36,6 +36,7 @@ public class SitemapService {
     private final SeoLocales locales;
     private final SitemapEntries entries;
     private final List<InstanceHandle<SitemapContributor>> contributors;
+    private final SeoOutputCache cache;
 
     /**
      * Create the service.
@@ -46,16 +47,18 @@ public class SitemapService {
      * @param locales the site locales
      * @param entries the entries found at build time
      * @param contributors the contributor beans, highest priority first
+     * @param cache the output cache
      */
     @Inject
     public SitemapService(SeoConfig config, SeoBuildConfig buildConfig, SitemapWriter writer, SeoLocales locales,
-            SitemapEntries entries, @All List<InstanceHandle<SitemapContributor>> contributors) {
+            SitemapEntries entries, @All List<InstanceHandle<SitemapContributor>> contributors, SeoOutputCache cache) {
         this.config = config;
         this.buildConfig = buildConfig;
         this.writer = writer;
         this.locales = locales;
         this.entries = entries;
         this.contributors = contributors;
+        this.cache = cache;
     }
 
     /**
@@ -64,6 +67,9 @@ public class SitemapService {
      * <p>
      * Page 0 is the whole sitemap. It is a URL set when the URL count is at most {@code max-urls}, and an index
      * otherwise. Page 1 and above are slices of {@code max-urls} URLs.
+     *
+     * <p>
+     * The cache key is the base URL and the page number. A page that does not exist is never cached.
      *
      * @param baseUrl the base URL that makes paths absolute
      * @param page the page number
@@ -74,6 +80,15 @@ public class SitemapService {
         if (page < 0) {
             return Optional.empty();
         }
+        try {
+            return Optional.of(cache.get(SeoOutputCache.SITEMAP, baseUrl + "|" + page,
+                    () -> generate(baseUrl, page).orElseThrow(MissingPage::new)));
+        } catch (MissingPage e) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<String> generate(String baseUrl, int page) {
         List<SitemapUrl> urls = collect();
         int max = Math.max(1, config.sitemap().maxUrls());
         int pages = (urls.size() + max - 1) / max;
@@ -126,6 +141,21 @@ public class SitemapService {
             String name = handle.getBean().getBeanClass().getName();
             LOG.error("Sitemap contributor " + name + " failed", e);
             throw new ContributorException(name, e);
+        }
+    }
+
+    /**
+     * Signal inside the cache computation that the page does not exist, so the cache stores nothing.
+     */
+    private static final class MissingPage extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Create the exception without a stack trace.
+         */
+        MissingPage() {
+            super(null, null, false, false);
         }
     }
 
