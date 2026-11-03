@@ -11,6 +11,7 @@ import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
+import io.quarkus.vertx.http.deployment.FilterBuildItem;
 import io.smallrye.config.ConfigValue;
 import io.smallrye.config.SmallRyeConfig;
 import io.quarkus.deployment.annotations.BuildStep;
@@ -90,6 +91,22 @@ class SeoProcessor {
      */
     static boolean metaEnabled(SeoBuildConfig config) {
         return config.enabled() && config.meta().enabled();
+    }
+
+    /**
+     * Register the filter that writes the {@code X-Robots-Tag} header.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @return the filter at priority 100, or null when the meta feature is switched off
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    FilterBuildItem robotsHeaderFilter(SeoRecorder recorder, SeoBuildConfig config) {
+        if (!metaEnabled(config)) {
+            return null;
+        }
+        return new FilterBuildItem(recorder.robotsHeaderFilter(), 100);
     }
 
     /**

@@ -9,6 +9,7 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 
 import io.quarkus.arc.Arc;
+import io.quarkus.arc.ArcContainer;
 import io.quarkus.arc.InstanceHandle;
 import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
 import io.vertx.ext.web.RoutingContext;
@@ -408,8 +409,11 @@ public class Seo {
     }
 
     private Seo publishRobots() {
-        InstanceHandle<CurrentVertxRequest> handle = Arc.container() == null ? null
-                : Arc.container().instance(CurrentVertxRequest.class);
+        ArcContainer container = Arc.container();
+        if (container == null || !container.requestContext().isActive()) {
+            return this;
+        }
+        InstanceHandle<CurrentVertxRequest> handle = container.instance(CurrentVertxRequest.class);
         if (handle != null && handle.isAvailable()) {
             RoutingContext context = handle.get().getCurrent();
             if (context != null) {
