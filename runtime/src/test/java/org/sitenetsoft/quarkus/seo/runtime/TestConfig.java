@@ -21,6 +21,11 @@ final class TestConfig {
         return this;
     }
 
+    TestConfig withDefault(String path, Object value) {
+        values.putIfAbsent(path, value);
+        return this;
+    }
+
     SeoConfig config() {
         return proxy(SeoConfig.class, "");
     }

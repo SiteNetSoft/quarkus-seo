@@ -15,6 +15,7 @@ import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.vertx.http.deployment.FilterBuildItem;
+import io.quarkus.vertx.http.deployment.NonApplicationRootPathBuildItem;
 import io.quarkus.vertx.http.deployment.RouteBuildItem;
 import io.quarkus.vertx.http.runtime.HandlerType;
 import io.smallrye.config.ConfigValue;
@@ -23,6 +24,7 @@ import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import org.sitenetsoft.quarkus.seo.Seo;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultBaseUrlResolver;
+import org.sitenetsoft.quarkus.seo.runtime.DefaultRobotsTxtProvider;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
@@ -42,6 +44,7 @@ import org.sitenetsoft.quarkus.seo.runtime.SitemapService;
 class SeoProcessor {
 
     static final String FEATURE = "seo";
+    private static final String ROBOTS_PATH = "/robots.txt";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
 
@@ -217,6 +220,66 @@ class SeoProcessor {
         routes.produce(RouteBuildItem.builder()
                 .routeFunction(recorder.getRegexRoute(pageRegex))
                 .handler(recorder.sitemapPageHandler())
+                .handlerType(HandlerType.BLOCKING)
+                .build());
+    }
+
+    /**
+     * Tell whether the robots.txt feature is switched on.
+     *
+     * @param config the build-time configuration
+     * @return true when the extension and the robots.txt feature are switched on
+     */
+    static boolean robotsEnabled(SeoBuildConfig config) {
+        return config.enabled() && config.robots().enabled();
+    }
+
+    /**
+     * Register the default robots.txt provider.
+     *
+     * @param config the build-time configuration
+     * @return the bean, or null when the robots.txt feature is switched off
+     */
+    @BuildStep
+    AdditionalBeanBuildItem robotsBeans(SeoBuildConfig config) {
+        if (!robotsEnabled(config)) {
+            return null;
+        }
+        return AdditionalBeanBuildItem.builder()
+                .addBeanClasses(DefaultRobotsTxtProvider.class)
+                .setUnremovable()
+                .build();
+    }
+
+    /**
+     * Register the robots.txt route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void robotsRoute(SeoRecorder recorder, SeoBuildConfig config,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!robotsEnabled(config)) {
+            return;
+        }
+        if (config.robots().serveUnderRootPath()) {
+            routes.produce(RouteBuildItem.builder()
+                    .routeFunction(recorder.getRoute(ROBOTS_PATH))
+                    .handler(recorder.robotsHandler())
+                    .handlerType(HandlerType.BLOCKING)
+                    .build());
+            return;
+        }
+        routes.produce(nonApplicationRootPath.routeBuilder()
+                .route(ROBOTS_PATH)
+                .handler(recorder.robotsHandler())
                 .handlerType(HandlerType.BLOCKING)
                 .build());
     }
