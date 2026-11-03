@@ -55,7 +55,10 @@
             <configuration>
               <deployment>${project.groupId}:${project.artifactId}-deployment:${project.version}</deployment>
               <capabilities>
-                <provides>org.sitenetsoft.seo</provides>
+                <providesIf>
+                  <name>org.sitenetsoft.seo</name>
+                  <positive>org.sitenetsoft.quarkus.seo.deployment.SeoMetaEnabled</positive>
+                </providesIf>
               </capabilities>
             </configuration>
           </execution>
