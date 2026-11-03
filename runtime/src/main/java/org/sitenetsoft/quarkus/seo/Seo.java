@@ -15,9 +15,9 @@ import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.sitenetsoft.quarkus.seo.runtime.RequestInfo;
 import org.sitenetsoft.quarkus.seo.runtime.RobotsHeader;
+import org.sitenetsoft.quarkus.seo.runtime.SeoLayers;
 import org.sitenetsoft.quarkus.seo.runtime.SeoResolver;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSettings;
-import org.sitenetsoft.quarkus.seo.runtime.SeoValues;
 import org.sitenetsoft.quarkus.seo.schema.SchemaNode;
 
 /**
@@ -29,8 +29,8 @@ import org.sitenetsoft.quarkus.seo.schema.SchemaNode;
 @RequestScoped
 public class Seo {
 
-    private final SeoValues java = new SeoValues();
-    private SeoValues tag = new SeoValues();
+    @Inject
+    SeoLayers layers;
 
     @Inject
     SeoResolver resolver;
@@ -51,7 +51,7 @@ public class Seo {
      * @return this object
      */
     public Seo title(String title) {
-        java.title(title);
+        layers.java().title(title);
         return this;
     }
 
@@ -62,7 +62,7 @@ public class Seo {
      * @return this object
      */
     public Seo absoluteTitle(String title) {
-        java.absoluteTitle(title);
+        layers.java().absoluteTitle(title);
         return this;
     }
 
@@ -73,7 +73,7 @@ public class Seo {
      * @return this object
      */
     public Seo description(String description) {
-        java.description(description);
+        layers.java().description(description);
         return this;
     }
 
@@ -84,7 +84,7 @@ public class Seo {
      * @return this object
      */
     public Seo canonical(String canonical) {
-        java.canonical(canonical);
+        layers.java().canonical(canonical);
         return this;
     }
 
@@ -95,7 +95,7 @@ public class Seo {
      * @return this object
      */
     public Seo type(String type) {
-        java.type(type);
+        layers.java().type(type);
         return this;
     }
 
@@ -106,7 +106,7 @@ public class Seo {
      * @return this object
      */
     public Seo image(String image) {
-        java.image(image);
+        layers.java().image(image);
         return this;
     }
 
@@ -119,7 +119,7 @@ public class Seo {
      * @return this object
      */
     public Seo image(String image, int width, int height) {
-        java.image(image).imageWidth(width).imageHeight(height);
+        layers.java().image(image).imageWidth(width).imageHeight(height);
         return this;
     }
 
@@ -130,7 +130,7 @@ public class Seo {
      * @return this object
      */
     public Seo imageAlt(String alt) {
-        java.imageAlt(alt);
+        layers.java().imageAlt(alt);
         return this;
     }
 
@@ -141,7 +141,7 @@ public class Seo {
      * @return this object
      */
     public Seo locale(Locale locale) {
-        java.locale(locale);
+        layers.java().locale(locale);
         return this;
     }
 
@@ -153,7 +153,7 @@ public class Seo {
      * @return this object
      */
     public Seo alternate(Locale locale, String path) {
-        java.alternate(locale, path);
+        layers.java().alternate(locale, path);
         return this;
     }
 
@@ -163,7 +163,7 @@ public class Seo {
      * @return this object
      */
     public Seo noindex() {
-        java.noindex(true);
+        layers.java().noindex(true);
         return publishRobots();
     }
 
@@ -173,7 +173,7 @@ public class Seo {
      * @return this object
      */
     public Seo nofollow() {
-        java.nofollow(true);
+        layers.java().nofollow(true);
         return publishRobots();
     }
 
@@ -183,7 +183,7 @@ public class Seo {
      * @return this object
      */
     public Seo noimageindex() {
-        java.noimageindex(true);
+        layers.java().noimageindex(true);
         return publishRobots();
     }
 
@@ -194,7 +194,7 @@ public class Seo {
      * @return this object
      */
     public Seo maxSnippet(int characters) {
-        java.maxSnippet(characters);
+        layers.java().maxSnippet(characters);
         return publishRobots();
     }
 
@@ -205,7 +205,7 @@ public class Seo {
      * @return this object
      */
     public Seo maxImagePreview(String size) {
-        java.maxImagePreview(size);
+        layers.java().maxImagePreview(size);
         return publishRobots();
     }
 
@@ -216,7 +216,7 @@ public class Seo {
      * @return this object
      */
     public Seo unavailableAfter(Instant time) {
-        java.unavailableAfter(time);
+        layers.java().unavailableAfter(time);
         return publishRobots();
     }
 
@@ -227,7 +227,7 @@ public class Seo {
      * @return this object
      */
     public Seo published(Instant time) {
-        java.published(time);
+        layers.java().published(time);
         return this;
     }
 
@@ -238,7 +238,7 @@ public class Seo {
      * @return this object
      */
     public Seo modified(Instant time) {
-        java.modified(time);
+        layers.java().modified(time);
         return this;
     }
 
@@ -249,7 +249,7 @@ public class Seo {
      * @return this object
      */
     public Seo author(String author) {
-        java.author(author);
+        layers.java().author(author);
         return this;
     }
 
@@ -260,7 +260,7 @@ public class Seo {
      * @return this object
      */
     public Seo section(String section) {
-        java.section(section);
+        layers.java().section(section);
         return this;
     }
 
@@ -272,7 +272,7 @@ public class Seo {
      */
     public Seo tag(String... tags) {
         for (String value : tags) {
-            java.tag(value);
+            layers.java().tag(value);
         }
         return this;
     }
@@ -284,7 +284,7 @@ public class Seo {
      * @return this object
      */
     public Seo twitterCard(String card) {
-        java.twitterCard(card);
+        layers.java().twitterCard(card);
         return this;
     }
 
@@ -295,7 +295,7 @@ public class Seo {
      * @return this object
      */
     public Seo jsonLd(SchemaNode node) {
-        java.jsonLd(node);
+        layers.java().jsonLd(node);
         return this;
     }
 
@@ -306,7 +306,7 @@ public class Seo {
      * @return this object
      */
     public Seo jsonLdRaw(String json) {
-        java.jsonLdRaw(json);
+        layers.java().jsonLdRaw(json);
         return this;
     }
 
@@ -318,7 +318,7 @@ public class Seo {
      * @return this object
      */
     public Seo meta(String name, String content) {
-        java.meta(new ResolvedSeo.Meta("name", name, content));
+        layers.java().meta(new ResolvedSeo.Meta("name", name, content));
         return this;
     }
 
@@ -330,7 +330,7 @@ public class Seo {
      * @return this object
      */
     public Seo property(String property, String content) {
-        java.meta(new ResolvedSeo.Meta("property", property, content));
+        layers.java().meta(new ResolvedSeo.Meta("property", property, content));
         return this;
     }
 
@@ -369,7 +369,7 @@ public class Seo {
      * @return the resolved values
      */
     public ResolvedSeo resolve() {
-        return resolver.resolve(tag, java, RequestInfo.current(baseUrlResolver, settings));
+        return resolver.resolve(layers.tag(), layers.java(), RequestInfo.current(baseUrlResolver, settings));
     }
 
     /**
@@ -381,33 +381,6 @@ public class Seo {
         return renderer.render(resolve());
     }
 
-    /**
-     * Return the values set in Java.
-     *
-     * @return the Java layer
-     */
-    public SeoValues javaValues() {
-        return java;
-    }
-
-    /**
-     * Return the values from the tag parameters.
-     *
-     * @return the tag layer
-     */
-    public SeoValues tagValues() {
-        return tag;
-    }
-
-    /**
-     * Store the values from the tag parameters.
-     *
-     * @param values the tag layer
-     */
-    public void tagValues(SeoValues values) {
-        this.tag = values == null ? new SeoValues() : values;
-    }
-
     private Seo publishRobots() {
         ArcContainer container = Arc.container();
         if (container == null || !container.requestContext().isActive()) {
@@ -417,7 +390,7 @@ public class Seo {
         if (handle != null && handle.isAvailable()) {
             RoutingContext context = handle.get().getCurrent();
             if (context != null) {
-                RobotsHeader.put(context, SeoResolver.directives(java));
+                RobotsHeader.put(context, SeoResolver.directives(layers.java()));
             }
         }
         return this;

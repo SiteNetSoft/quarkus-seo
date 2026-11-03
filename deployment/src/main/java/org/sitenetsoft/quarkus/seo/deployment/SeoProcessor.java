@@ -39,6 +39,7 @@ import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
 import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
+import org.sitenetsoft.quarkus.seo.runtime.SeoLayers;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
 import org.sitenetsoft.quarkus.seo.runtime.SeoResolver;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSectionHelperFactory;
@@ -119,7 +120,7 @@ class SeoProcessor {
     }
 
     /**
-     * Register the page bean, the resolver, the head renderer, the seo tag and the seo namespace.
+     * Register the page bean, the request layers, the resolver, the head renderer, the seo tag and the seo namespace.
      *
      * <p>
      * Qute reads the tag and the namespace from the bean archive index only, so both classes are added as beans.
@@ -133,7 +134,7 @@ class SeoProcessor {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
-                .addBeanClasses(Seo.class, SeoResolver.class, DefaultSeoHeadRenderer.class,
+                .addBeanClasses(Seo.class, SeoLayers.class, SeoResolver.class, DefaultSeoHeadRenderer.class,
                         SeoSectionHelperFactory.class, SeoTemplateExtensions.class)
                 .setUnremovable()
                 .build();

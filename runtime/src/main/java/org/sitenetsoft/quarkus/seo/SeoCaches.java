@@ -23,7 +23,7 @@ public class SeoCaches {
      * @param cache the output cache
      */
     @Inject
-    public SeoCaches(SeoOutputCache cache) {
+    SeoCaches(SeoOutputCache cache) {
         this.cache = cache;
     }
 

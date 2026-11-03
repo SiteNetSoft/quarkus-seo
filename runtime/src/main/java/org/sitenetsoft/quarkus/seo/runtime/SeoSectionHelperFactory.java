@@ -9,6 +9,7 @@ import java.util.concurrent.CompletionStage;
 
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ArcContainer;
+import io.quarkus.arc.ClientProxy;
 import io.quarkus.qute.EngineConfiguration;
 import io.quarkus.qute.Expression;
 import io.quarkus.qute.ResultNode;
@@ -16,7 +17,7 @@ import io.quarkus.qute.Scope;
 import io.quarkus.qute.SectionHelper;
 import io.quarkus.qute.SectionHelperFactory;
 import io.quarkus.qute.SingleResultNode;
-import org.sitenetsoft.quarkus.seo.Seo;
+import org.sitenetsoft.quarkus.seo.BaseUrlResolver;
 import org.sitenetsoft.quarkus.seo.SeoHeadRenderer;
 
 /**
@@ -93,22 +94,16 @@ public class SeoSectionHelperFactory implements SectionHelperFactory<SeoSectionH
     }
 
     /**
-     * Render the head tags for a tag layer.
+     * Render the head tags for a tag layer when no request context is active.
      *
      * <p>
-     * With an active request context, the tag layer goes to the request {@code Seo} bean. With no request context,
-     * the tag layer is resolved alone and nothing is stored.
+     * The tag layer is resolved alone and nothing is stored.
      *
      * @param tag the tag layer
      * @return the head tags
      */
-    static String render(SeoValues tag) {
+    static String renderAlone(SeoValues tag) {
         ArcContainer container = Arc.container();
-        if (container.requestContext().isActive()) {
-            Seo seo = container.instance(Seo.class).get();
-            seo.tagValues(tag);
-            return seo.head();
-        }
         SeoHeadRenderer renderer = container.instance(SeoHeadRenderer.class).get();
         SeoResolver resolver = container.instance(SeoResolver.class).get();
         return renderer.render(resolver.resolve(tag, new SeoValues(), Optional.empty()));
@@ -176,10 +171,32 @@ public class SeoSectionHelperFactory implements SectionHelperFactory<SeoSectionH
             this.expressions = expressions;
         }
 
+        /**
+         * Evaluate the parameters and render the head tags.
+         *
+         * <p>
+         * The method reads the request state before it evaluates the parameters. A parameter can complete on another
+         * thread, where no request context is active. The captured layers and request still apply there.
+         *
+         * @param context the resolution context
+         * @return the result node with the head tags
+         */
         @Override
         public CompletionStage<ResultNode> resolve(SectionResolutionContext context) {
-            return context.evaluate(expressions)
-                    .thenApply(values -> new SingleResultNode(render(tagValues(values))));
+            ArcContainer container = Arc.container();
+            if (!container.requestContext().isActive()) {
+                return context.evaluate(expressions)
+                        .thenApply(values -> new SingleResultNode(renderAlone(tagValues(values))));
+            }
+            SeoLayers layers = ClientProxy.unwrap(container.instance(SeoLayers.class).get());
+            Optional<RequestInfo> request = RequestInfo.current(container.instance(BaseUrlResolver.class).get(),
+                    container.instance(SeoSettings.class).get());
+            SeoHeadRenderer renderer = container.instance(SeoHeadRenderer.class).get();
+            SeoResolver resolver = container.instance(SeoResolver.class).get();
+            return context.evaluate(expressions).thenApply(values -> {
+                layers.tag(tagValues(values));
+                return new SingleResultNode(renderer.render(resolver.resolve(layers.tag(), layers.java(), request)));
+            });
         }
     }
 }
