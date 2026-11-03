@@ -22,8 +22,7 @@ import org.sitenetsoft.quarkus.seo.SeoLocales;
 @Singleton
 public class DefaultSeoLocales implements SeoLocales {
 
-    private static final String FIXED_SOURCE = "BuildTime RunTime Fixed";
-    private static final String DEFAULTS_SOURCE = "DefaultValuesConfigSource";
+    private static final String DEFAULT_EXPRESSION_MARK = "${user.language";
     private static final Locale FALLBACK = Locale.forLanguageTag("en-US");
 
     private final List<Locale> locales;
@@ -72,19 +71,21 @@ public class DefaultSeoLocales implements SeoLocales {
     }
 
     /**
-     * Read a locale key only when a developer set it.
+     * Read a locale key only when the application set it.
      *
      * <p>
-     * Quarkus fills both keys with a default taken from the build machine locale. The fixed build-time source
-     * holds that default and an explicit value alike, so the check looks at the other sources instead.
+     * Quarkus fills {@code quarkus.locales} with the build machine locale when no source sets it. The value comes
+     * from the profile-aware config lookup. It counts as set when it differs from that default, or when a source
+     * other than the one that won the lookup provides it. No source name is used.
      */
     private static List<String> explicitList(SmallRyeConfig config, String key) {
-        if (!isExplicit(config, key)) {
-            return List.of();
-        }
         ConfigValue value = config.getConfigValue(key);
         List<String> result = new ArrayList<>();
-        if (value == null || value.getValue() == null) {
+        if (value == null || value.getValue() == null || value.getValue().isBlank()) {
+            return result;
+        }
+        boolean differs = !value.getValue().equals(machineDefault());
+        if (!differs && !providedElsewhere(config, key, value.getConfigSourceOrdinal())) {
             return result;
         }
         for (String part : value.getValue().split(",")) {
@@ -95,13 +96,25 @@ public class DefaultSeoLocales implements SeoLocales {
         return result;
     }
 
-    private static boolean isExplicit(SmallRyeConfig config, String key) {
+    /**
+     * Expand the Quarkus default of {@code quarkus.locales} on this JVM.
+     */
+    private static String machineDefault() {
+        return System.getProperty("user.language", "en") + "-" + System.getProperty("user.country", "");
+    }
+
+    private static boolean providedElsewhere(SmallRyeConfig config, String key, int winningOrdinal) {
         for (ConfigSource source : config.getConfigSources()) {
-            String name = source.getName();
-            if (FIXED_SOURCE.equals(name) || DEFAULTS_SOURCE.equals(name)) {
+            if (source.getOrdinal() == winningOrdinal) {
                 continue;
             }
-            if (source.getValue(key) != null) {
+            for (String profile : config.getProfiles()) {
+                if (source.getValue("%" + profile + "." + key) != null) {
+                    return true;
+                }
+            }
+            String raw = source.getValue(key);
+            if (raw != null && !raw.contains(DEFAULT_EXPRESSION_MARK)) {
                 return true;
             }
         }
