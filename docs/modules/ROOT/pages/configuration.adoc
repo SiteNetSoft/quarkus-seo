@@ -24,7 +24,7 @@ Some keys fall back to a Quarkus key when you do not set them:
 
 |`quarkus.seo.site-url`
 |None
-|The host of the request.
+|The scheme and host of the request, followed by the root path.
 
 |`quarkus.seo.indexable`
 |None
@@ -33,7 +33,10 @@ Some keys fall back to a Quarkus key when you do not set them:
 
 The extension uses these Quarkus keys as they are:
 
-* `quarkus.http.root-path` is the prefix of endpoints and generated links.
+* `quarkus.http.root-path` is the prefix of endpoints and generated links. The extension does not append it to
+`quarkus.seo.site-url`. The site URL is the public URL of the application root, so it must hold any public path
+prefix itself.
+* `quarkus.rest.path` and an `@ApplicationPath` annotation are the prefix of the `@SitemapEntry` paths.
 * `quarkus.http.proxy.*` controls which forwarded headers Quarkus trusts.
 * `quarkus.http.enable-compression` controls gzip of the sitemap.
 * `quarkus.cache.*` configures the caches `seo-sitemap` and `seo-robots`.

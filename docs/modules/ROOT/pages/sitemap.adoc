@@ -29,6 +29,10 @@ public TemplateInstance products() {
 ----
 +
 Only the value `-1` means that `priority` is unset. Any other value must be between 0.0 and 1.0.
++
+The sitemap path of the method includes the JAX-RS prefix. An `@ApplicationPath` on an `Application` subclass sets
+that prefix. Without one, the build-time key `quarkus.rest.path` sets it. With `quarkus.rest.path=/api`, the method
+above appears in the sitemap as `/api/products`. Reactive Routes take no JAX-RS prefix.
 
 Beans::
 Write a CDI bean that implements `SitemapContributor`. Its `urls()` method returns a `Stream<SitemapUrl>`. The
@@ -68,7 +72,10 @@ time of the last real change of the page. If you do not know that time, set noth
 * Up to `quarkus.seo.sitemap.max-urls` URLs, the default is 50000, form one `urlset` at the sitemap path.
 * Above that limit, the sitemap path serves a `sitemapindex`. The pages are at `quarkus.seo.sitemap.page-path`.
 The default is `/sitemap-{n}.xml`. The token `{n}` is the page number.
-* Alternates become `xhtml:link` elements, with a link for the page itself and an `x-default` link.
+* The extension adds a leading slash to both paths, collapses repeated slashes and strips a trailing slash. If a path
+holds a colon, an asterisk or whitespace, the build fails.
+* Alternates become `xhtml:link` elements, with a link for the page itself and an `x-default` link. If no alternate
+points to the URL itself, the extension adds a link for the URL with the tag of the default locale.
 * The extension writes images with the image namespace.
 * The content type is `application/xml; charset=utf-8`.
 * Every response has an ETag. A request with a matching `If-None-Match` header gets a 304 response.
@@ -86,7 +93,11 @@ Caching is off by default. To cache the generated XML:
 . Set `quarkus.seo.sitemap.cache.enabled=true`.
 
 The extension stores the output in the cache named `seo-sitemap`. The key holds the base URL, so hosts never share
-one cached output. Configure the cache with the `quarkus.cache.caffeine.seo-sitemap.*` keys or with the keys of the
+one cached output.
+
+The extension uses the cache only when the hosts are pinned. The hosts are pinned when you set
+`quarkus.seo.site-url` or `quarkus.seo.allowed-hosts`. Otherwise every `Host` header would add an entry to the
+cache. Without a pinned host, the extension generates the output on each request. It then logs one DEBUG message. Configure the cache with the `quarkus.cache.caffeine.seo-sitemap.*` keys or with the keys of the
 Redis or Infinispan cache. The robots.txt uses the cache `seo-robots` with `quarkus.seo.robots.cache.enabled`.
 
 If you enable the cache and `quarkus-cache` is not present, the extension logs one INFO message at startup. It then
@@ -108,10 +119,14 @@ public void publish(Post post) {
 `SeoCaches` also has `invalidateRobots()`. The methods never block and never throw. They are safe on any thread,
 including a Vert.x event loop. They do nothing when no cache is active.
 
+The `SeoCaches` bean exists only when the extension serves the sitemap or robots.txt. If you switch both off or your
+application serves both paths, inject `Instance<SeoCaches>` instead.
+
 == When your application serves its own sitemap
 
 If your application serves the sitemap path in any way that the build sees, the extension serves no sitemap. The build
-sees static files, JAX-RS paths and Reactive Routes. The limits on the `robots.txt` page apply here too. See
+sees static files, JAX-RS paths and Reactive Routes. A JAX-RS path includes the `@ApplicationPath` or
+`quarkus.rest.path` prefix. The limits on the `robots.txt` page apply here too. See
 xref:robots.adoc#when-your-application-serves-robotstxt[When your application serves robots.txt].
 
 == Switch the feature off

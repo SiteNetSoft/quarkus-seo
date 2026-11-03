@@ -21,6 +21,12 @@ as not set, on the tag and in Java.
 A higher layer replaces only the fields that it sets. Setting a title does not clear the image. Lists such as
 alternates and JSON-LD nodes add to the lower layer.
 
+Some fields form a group. The title and the absolute title are one group. The image, its width, its height and its
+alt text are another group. When a higher layer sets any field of a group, the whole group comes from that layer. A
+field of the group that the higher layer does not set stays unset. For example, an image from Java drops the width,
+the height and the alt text of the image in the tag. The key `quarkus.seo.image-alt` applies only to the image of
+`quarkus.seo.image`.
+
 === Set values in the template
 
 The tag takes these parameters: `title`, `absoluteTitle`, `description`, `canonical`, `type`, `image`, `imageWidth`,
@@ -186,6 +192,8 @@ xref:customizing.adoc[Customizing].
 When the site is not indexable, every page gets `noindex, nofollow` in the robots meta tag. The extension also sends
 the `X-Robots-Tag: noindex, nofollow` header on every response. That includes 404 responses and static files.
 
+The filter never overwrites an `X-Robots-Tag` header that the application set.
+
 When the site is indexable, the header carries only the directives that Java code set on `Seo`. The `{#seo}` tag
 writes its directives into the meta tag only. The response headers can already be sent when the template renders.
 The extension does not buffer response bodies. If you need the header for a page, set `noindex` in Java:
@@ -204,9 +212,18 @@ Absolute URLs need a base. The extension resolves the base in this order:
 `quarkus.http.proxy.*`. Otherwise it uses the plain `Host` header.
 . If you set `quarkus.seo.allowed-hosts` and the host of the request is not in the list, the first allowed host.
 
+When the host of the request matches an entry of `quarkus.seo.allowed-hosts`, the base uses the text of that entry.
+The match ignores case and the port of the request. An entry without a port gives a URL without a port. The port of
+the request never reaches the URL.
+
 A spoofed `Host` header can therefore reach canonical links, and a CDN can cache them. In production, set
 `quarkus.seo.site-url`. If your application serves several hosts, set `quarkus.seo.allowed-hosts`. The sitemap and
 `/robots.txt` use the same rules.
+
+The value of `quarkus.seo.site-url` is the public URL of the application root. The extension does not append
+`quarkus.http.root-path` to it. If the application has a public path prefix, put the prefix in the site URL. For
+example, with the root path `/app`, set `quarkus.seo.site-url=https://example.org/app`. The canonical link of
+`/app/about` is then `https://example.org/app/about`.
 
 == Output rules
 
@@ -216,5 +233,7 @@ A spoofed `Host` header can therefore reach canonical links, and a CDN can cache
 
 == Switch the feature off
 
-Set `quarkus.seo.meta.enabled=false` at build time. The extension then registers no `{#seo}` tag, no `Seo` bean and
-no X-Robots-Tag filter. Set `quarkus.seo.enabled=false` to switch every feature off.
+Set `quarkus.seo.meta.enabled=false` at build time. The extension then registers no `{#seo}` tag, no `seo:`
+namespace, no `Seo` bean and no X-Robots-Tag filter. It also drops the capability `org.sitenetsoft.seo`. A template
+that still uses the tag or the namespace fails the build. Code that injects `Seo` fails the build too. Set
+`quarkus.seo.enabled=false` to switch every feature off.

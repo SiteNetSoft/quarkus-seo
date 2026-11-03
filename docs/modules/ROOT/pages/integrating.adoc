@@ -6,7 +6,9 @@ authors of other extensions.
 
 == The capability
 
-Quarkus SEO declares the capability `org.sitenetsoft.seo`. An extension checks it in its deployment processor:
+Quarkus SEO declares the capability `org.sitenetsoft.seo` when the meta tag feature is on. The feature is on when
+`quarkus.seo.enabled` and `quarkus.seo.meta.enabled` are both true. An extension checks the capability in its
+deployment processor:
 
 [source,java]
 ----
@@ -20,6 +22,13 @@ void integrateSeo(Capabilities capabilities) {
 
 The check is a string comparison. Your extension needs no dependency on `quarkus-seo`. The extension that knows the
 other one does the integration. Quarkus SEO knows nothing about other extensions.
+
+When an application sets `quarkus.seo.meta.enabled=false`, the capability is absent. The `{#seo}` tag, the `seo:`
+namespace and the `Seo` bean are absent too. A template that still uses the tag or the namespace fails the build. So
+render the tag only when the capability is present.
+
+The `SeoCaches` bean exists only when the extension serves the sitemap or robots.txt. If your extension injects it,
+inject it as `Instance<SeoCaches>` and check that it is resolvable.
 
 == The public contract
 
