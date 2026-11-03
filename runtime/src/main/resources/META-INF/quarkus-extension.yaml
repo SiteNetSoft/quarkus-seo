@@ -1,0 +1,17 @@
+name: SEO
+description: Add meta tags, sitemaps and robots.txt to web pages
+artifactId: quarkus-seo
+metadata:
+  keywords:
+    - seo
+    - sitemap
+    - robots
+    - meta
+    - open-graph
+    - json-ld
+  categories:
+    - web
+  status: preview
+  config:
+    - quarkus.seo.
+  guide: https://sitenetsoft.github.io/quarkus-seo/
