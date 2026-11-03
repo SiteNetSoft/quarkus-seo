@@ -1,5 +1,6 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
@@ -17,6 +18,8 @@ import io.quarkus.cache.CacheName;
  *
  * <p>
  * The class loads only when {@code quarkus-cache} is present. A cache whose run-time key is off computes directly.
+ * The caches also compute directly when no host is pinned, so that spoofed {@code Host} headers cannot fill them. A
+ * host is pinned when {@code quarkus.seo.site-url} or {@code quarkus.seo.allowed-hosts} is set.
  */
 @Singleton
 public class CacheManagerSeoOutputCache implements SeoOutputCache {
@@ -26,6 +29,7 @@ public class CacheManagerSeoOutputCache implements SeoOutputCache {
     private final Cache sitemap;
     private final Cache robots;
     private final SeoConfig config;
+    private final boolean pinned;
 
     /**
      * Create the cache.
@@ -40,6 +44,29 @@ public class CacheManagerSeoOutputCache implements SeoOutputCache {
         this.sitemap = sitemap;
         this.robots = robots;
         this.config = config;
+        this.pinned = pinned(config);
+        if (!pinned && (config.sitemap().cache().enabled() || config.robots().cache().enabled())) {
+            LOG.debug("The SEO output cache is not used because neither quarkus.seo.site-url nor "
+                    + "quarkus.seo.allowed-hosts is set");
+        }
+    }
+
+    /**
+     * Tell whether the configuration pins the hosts of the base URL.
+     *
+     * @param config the run-time SEO configuration
+     * @return true when the site URL is set and not blank or when an allowed host is set
+     */
+    static boolean pinned(SeoConfig config) {
+        if (config.siteUrl().isPresent() && !config.siteUrl().get().isBlank()) {
+            return true;
+        }
+        for (String host : config.allowedHosts().orElse(List.of())) {
+            if (!host.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -87,6 +114,9 @@ public class CacheManagerSeoOutputCache implements SeoOutputCache {
     }
 
     private boolean enabled(String cacheName) {
+        if (!pinned) {
+            return false;
+        }
         if (SITEMAP.equals(cacheName)) {
             return config.sitemap().cache().enabled();
         }

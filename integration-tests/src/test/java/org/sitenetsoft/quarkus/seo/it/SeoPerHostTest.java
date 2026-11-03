@@ -9,7 +9,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
-@TestProfile(NoSiteUrlProfile.class)
+@TestProfile(PinnedHostsProfile.class)
 class SeoPerHostTest {
 
     @Test
@@ -18,7 +18,13 @@ class SeoPerHostTest {
         String b = sitemapFor("b.example");
         assertThat(a).contains("<loc>http://a.example/blog/first</loc>").doesNotContain("b.example");
         assertThat(b).contains("<loc>http://b.example/blog/first</loc>").doesNotContain("a.example");
+        int before = calls();
         assertThat(sitemapFor("a.example")).isEqualTo(a);
+        assertThat(calls()).isEqualTo(before);
+    }
+
+    private static int calls() {
+        return Integer.parseInt(given().get("/contributor-calls").then().statusCode(200).extract().asString());
     }
 
     private static String sitemapFor(String host) {
