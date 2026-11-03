@@ -1,10 +1,14 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import io.quarkus.runtime.annotations.Recorder;
 import io.vertx.core.Handler;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.ext.web.Route;
+import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 
 /**
@@ -35,5 +39,57 @@ public class SeoRecorder {
      */
     public Handler<RoutingContext> robotsHeaderFilter() {
         return new RobotsHeaderFilter();
+    }
+
+    /**
+     * Create the supplier of the sitemap entries found at build time.
+     *
+     * @param paths the paths of the entries
+     * @param changefreqs the lower case change frequencies, with an empty string when unset
+     * @param priorities the priorities, with -1 when unset
+     * @return the supplier of the holder
+     */
+    public Supplier<SitemapEntries> sitemapEntries(List<String> paths, List<String> changefreqs,
+            List<Double> priorities) {
+        SitemapEntries entries = new SitemapEntries(paths, changefreqs, priorities);
+        return () -> entries;
+    }
+
+    /**
+     * Create the handler of the sitemap path.
+     *
+     * @return the handler that serves the sitemap or the sitemap index
+     */
+    public Handler<RoutingContext> sitemapHandler() {
+        return new SitemapHandler(false);
+    }
+
+    /**
+     * Create the handler of the sitemap page path.
+     *
+     * @return the handler that reads the page number from the first regex group
+     */
+    public Handler<RoutingContext> sitemapPageHandler() {
+        return new SitemapHandler(true);
+    }
+
+    /**
+     * Create a route function that matches GET and HEAD requests on a path.
+     *
+     * @param path the exact path
+     * @return the route function
+     */
+    public Function<Router, Route> getRoute(String path) {
+        return router -> router.route(path).method(HttpMethod.GET).method(HttpMethod.HEAD);
+    }
+
+    /**
+     * Create a route function that matches GET and HEAD requests on a regular expression.
+     *
+     * @param regex the regular expression of the path
+     * @return the route function
+     */
+    public Function<Router, Route> getRegexRoute(String regex) {
+        return router -> router.routeWithRegex(regex).method(HttpMethod.GET).method(HttpMethod.HEAD);
     }
 }
