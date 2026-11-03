@@ -68,6 +68,36 @@ class SeoResolverTest {
     }
 
     @Test
+    void javaTitleReplacesTagAbsoluteTitle() {
+        ResolvedSeo seo = resolve(new SeoValues().absoluteTitle("Tag exact"), new SeoValues().title("About"));
+        assertThat(seo.title()).isEqualTo("About | Acme");
+        assertThat(seo.ogTitle()).contains("About");
+    }
+
+    @Test
+    void higherImageDropsTheSizeAndAltOfTheLowerImage() {
+        SeoValues tag = new SeoValues().image("/tag.png").imageWidth(1200).imageHeight(630).imageAlt("Tag");
+        ResolvedSeo.Image image = resolve(tag, new SeoValues().image("/java.png")).image().orElseThrow();
+        assertThat(image.url()).isEqualTo("https://ex.com/java.png");
+        assertThat(image.width()).isNull();
+        assertThat(image.height()).isNull();
+        assertThat(image.alt()).isNull();
+    }
+
+    @Test
+    void configImageAltAppliesOnlyWithTheConfigImage() {
+        SeoResolver withImage = resolver(settings(true), Locale.ENGLISH,
+                new TestConfig().with("image", "/c.png").with("imageAlt", "Config"));
+        assertThat(withImage.resolve(new SeoValues(), new SeoValues(), ABOUT).image().orElseThrow().alt())
+                .isEqualTo("Config");
+        assertThat(withImage.resolve(new SeoValues(), new SeoValues().image("/j.png"), ABOUT).image().orElseThrow()
+                .alt()).isNull();
+        SeoResolver altOnly = resolver(settings(true), Locale.ENGLISH, new TestConfig().with("imageAlt", "Config"));
+        assertThat(altOnly.resolve(new SeoValues(), new SeoValues().image("/j.png"), ABOUT).image().orElseThrow()
+                .alt()).isNull();
+    }
+
+    @Test
     void titleWithPercentAndPlaceholderDoesNotThrow() {
         assertThat(resolve(new SeoValues(), new SeoValues().title("100% {site-name}")).title())
                 .isEqualTo("100% {site-name} | Acme");

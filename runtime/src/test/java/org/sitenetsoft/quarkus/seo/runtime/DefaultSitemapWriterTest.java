@@ -122,6 +122,24 @@ class DefaultSitemapWriterTest {
     }
 
     @Test
+    void alternatesWithoutSelfGetASelfLinkWithTheDefaultLocale() {
+        String xml = writer.urlSet(List.of(SitemapUrl.of("/blog/hello").alternate(Locale.FRENCH, "/fr/blog/hello")),
+                "https://ex.com", Locale.ENGLISH);
+        assertThat(xml).contains("<url><loc>https://ex.com/blog/hello</loc>"
+                + "<xhtml:link rel=\"alternate\" hreflang=\"en\" href=\"https://ex.com/blog/hello\"/>"
+                + "<xhtml:link rel=\"alternate\" hreflang=\"fr\" href=\"https://ex.com/fr/blog/hello\"/>"
+                + "<xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"https://ex.com/blog/hello\"/>"
+                + "</url>");
+    }
+
+    @Test
+    void explicitSelfAlternateIsNotRepeated() {
+        String xml = writer.urlSet(List.of(SitemapUrl.of("/en/a").alternate(Locale.ENGLISH, "/en/a")
+                .alternate(Locale.FRENCH, "/fr/a")), "https://ex.com", Locale.ENGLISH);
+        assertThat(xml.split("href=\"https://ex.com/en/a\"", -1)).hasSize(3);
+    }
+
+    @Test
     void imagesUseTheImageNamespace() {
         String xml = writer.urlSet(List.of(SitemapUrl.of("/a").image("/i.png")), "https://ex.com", Locale.ENGLISH);
         assertThat(xml).contains("xmlns:image=\"http://www.google.com/schemas/sitemap-image/1.1\"",

@@ -68,12 +68,34 @@ public class DefaultSitemapWriter implements SitemapWriter {
         xml.append("</url>\n");
     }
 
+    /**
+     * Write the alternate links of a URL.
+     *
+     * <p>
+     * When no alternate points to the URL itself, the method first writes a link for the URL with the tag of the
+     * default locale. It skips that link when an alternate already uses the default locale. The {@code x-default}
+     * link comes last.
+     */
     private static void writeAlternates(StringBuilder xml, SitemapUrl url, String baseUrl, Locale defaultLocale) {
+        if (url.alternates().isEmpty()) {
+            return;
+        }
+        String self = location(baseUrl, url.loc());
+        boolean hasSelf = false;
+        boolean hasDefault = false;
+        for (Map.Entry<Locale, String> alternate : url.alternates().entrySet()) {
+            hasSelf |= location(baseUrl, alternate.getValue()).equals(self);
+            hasDefault |= alternate.getKey().equals(defaultLocale);
+        }
         String xDefault = null;
+        if (!hasSelf && !hasDefault && defaultLocale != null) {
+            writeLink(xml, defaultLocale.toLanguageTag(), self);
+            xDefault = self;
+        }
         for (Map.Entry<Locale, String> alternate : url.alternates().entrySet()) {
             String href = location(baseUrl, alternate.getValue());
             writeLink(xml, alternate.getKey().toLanguageTag(), href);
-            if (defaultLocale != null && alternate.getKey().equals(defaultLocale)) {
+            if (xDefault == null && alternate.getKey().equals(defaultLocale)) {
                 xDefault = href;
             }
         }

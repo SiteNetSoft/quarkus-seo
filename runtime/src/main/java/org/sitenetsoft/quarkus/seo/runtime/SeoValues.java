@@ -580,7 +580,9 @@ public class SeoValues {
      * Merge this layer over a lower one.
      *
      * <p>
-     * Each field set here replaces the field of the lower layer. The lists hold the lower entries first.
+     * Each field set here replaces the field of the lower layer. The title and the absolute title form one group.
+     * The image, its width, its height and its alt text form another group. When this layer sets any field of a
+     * group, the whole group comes from this layer. The lists hold the lower entries first.
      *
      * @param lower the layer below this one
      * @return a new object with the merged values
@@ -593,10 +595,8 @@ public class SeoValues {
     }
 
     private void copyFrom(SeoValues source) {
-        if (source.title != null) {
+        if (source.title != null || source.absoluteTitle != null) {
             title = source.title;
-        }
-        if (source.absoluteTitle != null) {
             absoluteTitle = source.absoluteTitle;
         }
         if (source.description != null) {
@@ -608,10 +608,11 @@ public class SeoValues {
         if (source.type != null) {
             type = source.type;
         }
-        if (source.image != null) {
+        if (source.image != null || source.imageWidth != null || source.imageHeight != null
+                || source.imageAlt != null) {
             image = source.image;
-        }
-        if (source.imageAlt != null) {
+            imageWidth = source.imageWidth;
+            imageHeight = source.imageHeight;
             imageAlt = source.imageAlt;
         }
         if (source.author != null) {
@@ -625,12 +626,6 @@ public class SeoValues {
         }
         if (source.maxImagePreview != null) {
             maxImagePreview = source.maxImagePreview;
-        }
-        if (source.imageWidth != null) {
-            imageWidth = source.imageWidth;
-        }
-        if (source.imageHeight != null) {
-            imageHeight = source.imageHeight;
         }
         if (source.locale != null) {
             locale = source.locale;

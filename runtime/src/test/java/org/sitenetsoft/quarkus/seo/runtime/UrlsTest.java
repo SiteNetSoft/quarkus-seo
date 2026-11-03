@@ -31,6 +31,12 @@ class UrlsTest {
     }
 
     @Test
+    void canonicalQueryToleratesMalformedPercentEncoding() {
+        assertThat(Urls.canonicalQuery("%zz=1&page=2", List.of("page"))).isEqualTo("page=2");
+        assertThat(Urls.canonicalQuery("%zz=1&page=2", List.of("%zz"))).isEqualTo("%zz=1");
+    }
+
+    @Test
     void refusesHostsWithPathOrMarkup() {
         assertThat(Urls.isSafeHost("ex.com:8443")).isTrue();
         assertThat(Urls.isSafeHost("[::1]:8080")).isTrue();

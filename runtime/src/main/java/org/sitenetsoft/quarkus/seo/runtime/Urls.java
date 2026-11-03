@@ -47,7 +47,7 @@ final class Urls {
      * Keep only the listed query parameters.
      *
      * @param rawQuery the raw query string without the question mark, or null
-     * @param keep the parameter names to keep
+     * @param keep the parameter names to keep, compared with the decoded names
      * @return the kept parameters in request order, or an empty string
      */
     static String canonicalQuery(String rawQuery, List<String> keep) {
@@ -61,8 +61,7 @@ final class Urls {
             }
             int equals = pair.indexOf('=');
             String rawName = equals < 0 ? pair : pair.substring(0, equals);
-            String name = URLDecoder.decode(rawName, StandardCharsets.UTF_8);
-            if (keep.contains(name)) {
+            if (keep.contains(decodedName(rawName))) {
                 if (result.length() > 0) {
                     result.append('&');
                 }
@@ -70,6 +69,20 @@ final class Urls {
             }
         }
         return result.toString();
+    }
+
+    /**
+     * Decode a query parameter name.
+     *
+     * @param rawName the name as it appears in the query
+     * @return the decoded name, or the raw name when its percent-encoding is malformed
+     */
+    private static String decodedName(String rawName) {
+        try {
+            return URLDecoder.decode(rawName, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return rawName;
+        }
     }
 
     /**

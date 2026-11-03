@@ -20,9 +20,9 @@ public @interface SitemapEntry {
     String changefreq() default "";
 
     /**
-     * Set the priority between 0.0 and 1.0.
+     * Set the priority.
      *
-     * @return the priority, or a negative value to leave it out
+     * @return the priority, where -1 leaves it out and any other value must be between 0 and 1
      */
     double priority() default -1;
 }

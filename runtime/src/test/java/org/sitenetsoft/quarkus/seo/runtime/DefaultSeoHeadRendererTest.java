@@ -101,6 +101,12 @@ class DefaultSeoHeadRendererTest {
     }
 
     @Test
+    void blankTitleWritesNoTitleElement() {
+        assertThat(renderer.render(minimal(""))).doesNotContain("<title>");
+        assertThat(renderer.render(minimal("  "))).doesNotContain("<title>");
+    }
+
+    @Test
     void emptyJsonLdWritesNoScript() {
         assertThat(renderer.render(minimal("Home"))).doesNotContain("<script");
     }

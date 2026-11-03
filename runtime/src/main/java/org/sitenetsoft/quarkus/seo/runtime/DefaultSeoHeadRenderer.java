@@ -25,7 +25,9 @@ public class DefaultSeoHeadRenderer implements SeoHeadRenderer {
     @Override
     public String render(ResolvedSeo seo) {
         StringBuilder out = new StringBuilder();
-        out.append("<title>").append(Html.escape(seo.title())).append("</title>\n");
+        if (seo.title() != null && !seo.title().isBlank()) {
+            out.append("<title>").append(Html.escape(seo.title())).append("</title>\n");
+        }
         meta(out, "name", "description", seo.description().orElse(null));
         if (!seo.robots().isEmpty()) {
             meta(out, "name", "robots", String.join(", ", seo.robots()));

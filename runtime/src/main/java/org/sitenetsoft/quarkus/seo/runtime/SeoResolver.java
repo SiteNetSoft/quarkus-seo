@@ -55,10 +55,10 @@ public class SeoResolver {
      * @return the resolved values
      */
     public ResolvedSeo resolve(SeoValues tag, SeoValues java, Optional<RequestInfo> request) {
-        SeoValues defaults = new SeoValues()
-                .description(config.description().orElse(null))
-                .image(config.image().orElse(null))
-                .imageAlt(config.imageAlt().orElse(null));
+        SeoValues defaults = new SeoValues().description(config.description().orElse(null));
+        if (config.image().isPresent() && !config.image().get().isBlank()) {
+            defaults.image(config.image().get()).imageAlt(config.imageAlt().orElse(null));
+        }
         SeoValues merged = java.over(tag.over(defaults));
         String base = request.map(RequestInfo::baseUrl).orElse(null);
 

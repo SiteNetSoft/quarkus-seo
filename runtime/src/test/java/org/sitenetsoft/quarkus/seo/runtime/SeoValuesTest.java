@@ -18,6 +18,23 @@ class SeoValuesTest {
     }
 
     @Test
+    void titleAndAbsoluteTitleAreOneGroup() {
+        SeoValues merged = new SeoValues().title("B").over(new SeoValues().absoluteTitle("A"));
+        assertThat(merged.title()).isEqualTo("B");
+        assertThat(merged.absoluteTitle()).isNull();
+    }
+
+    @Test
+    void imageFieldsAreOneGroup() {
+        SeoValues lower = new SeoValues().image("/a.png").imageWidth(1200).imageHeight(630).imageAlt("A");
+        SeoValues merged = new SeoValues().image("/b.png").over(lower);
+        assertThat(merged.image()).isEqualTo("/b.png");
+        assertThat(merged.imageWidth()).isNull();
+        assertThat(merged.imageHeight()).isNull();
+        assertThat(merged.imageAlt()).isNull();
+    }
+
+    @Test
     void listsAddLowerFirst() {
         SeoValues merged = new SeoValues().alternate(Locale.FRENCH, "/fr")
                 .over(new SeoValues().alternate(Locale.ENGLISH, "/en"));
