@@ -28,7 +28,27 @@ class DefaultBaseUrlResolverTest {
 
     @Test
     void safeHostIsKeptWithTheRootPath() {
-        assertThat(DefaultBaseUrlResolver.choose("https", "Ex.com:8443", List.of("ex.com"), "/app", () -> "x"))
+        assertThat(DefaultBaseUrlResolver.choose("https", "Ex.com:8443", List.of(), "/app", () -> "x"))
                 .isEqualTo("https://Ex.com:8443/app");
+    }
+
+    @Test
+    void allowedHostUsesTheEntryTextAndNotTheRequestAuthority() {
+        assertThat(DefaultBaseUrlResolver.choose("https", "Ex.com:8443", List.of("ex.com"), "/app", () -> "x"))
+                .isEqualTo("https://ex.com/app");
+        assertThat(DefaultBaseUrlResolver.choose("http", "example.com:6666", List.of("example.com"), "", () -> "x"))
+                .isEqualTo("http://example.com");
+    }
+
+    @Test
+    void allowedEntryKeepsItsOwnPort() {
+        assertThat(DefaultBaseUrlResolver.choose("http", "api.ex.com:9999", List.of("ex.com", " API.ex.com:8443 "), "",
+                () -> "x")).isEqualTo("http://api.ex.com:8443");
+    }
+
+    @Test
+    void fallbackEntryIsTrimmed() {
+        assertThat(DefaultBaseUrlResolver.choose("http", "evil.example", List.of(" ex.com "), "", () -> "x"))
+                .isEqualTo("http://ex.com");
     }
 }

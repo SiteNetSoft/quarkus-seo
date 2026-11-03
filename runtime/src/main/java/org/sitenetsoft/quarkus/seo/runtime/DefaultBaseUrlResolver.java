@@ -52,6 +52,11 @@ public class DefaultBaseUrlResolver implements BaseUrlResolver {
     /**
      * Choose the host of the base URL.
      *
+     * <p>
+     * When the request host matches an allowed host, the base uses the text of the allowed entry and never the
+     * request authority. The match ignores case and the request port. An entry without a port gives a URL without a
+     * port, which is the default port of the scheme.
+     *
      * @param scheme the request scheme
      * @param authority the host and port of the request, or null when missing
      * @param allowed the allowed hosts, empty when any safe host is accepted
@@ -61,13 +66,20 @@ public class DefaultBaseUrlResolver implements BaseUrlResolver {
      */
     static String choose(String scheme, String authority, List<String> allowed, String rootPath,
             Supplier<String> serverAuthority) {
-        if (authority != null && Urls.isSafeHost(authority) && isAllowed(authority, allowed)) {
-            return scheme + "://" + authority + rootPath;
+        boolean safe = authority != null && Urls.isSafeHost(authority);
+        if (allowed.isEmpty()) {
+            return scheme + "://" + (safe ? authority : serverAuthority.get()) + rootPath;
         }
-        if (!allowed.isEmpty()) {
-            return scheme + "://" + allowed.get(0) + rootPath;
+        if (safe) {
+            String host = hostOf(authority.toLowerCase(Locale.ROOT));
+            for (String entry : allowed) {
+                String clean = entry.trim().toLowerCase(Locale.ROOT);
+                if (!clean.isEmpty() && hostOf(clean).equals(host)) {
+                    return scheme + "://" + clean + rootPath;
+                }
+            }
         }
-        return scheme + "://" + serverAuthority.get() + rootPath;
+        return scheme + "://" + allowed.get(0).trim().toLowerCase(Locale.ROOT) + rootPath;
     }
 
     private static String authorityOf(HttpServerRequest request) {
@@ -92,22 +104,15 @@ public class DefaultBaseUrlResolver implements BaseUrlResolver {
         return port > 0 ? host + ":" + port : host;
     }
 
-    private static boolean isAllowed(String authority, List<String> allowed) {
-        if (allowed.isEmpty()) {
-            return true;
+    /**
+     * Strip the port from a host and port value.
+     */
+    private static String hostOf(String authority) {
+        int colon = authority.lastIndexOf(':');
+        if (colon > 0 && authority.indexOf(']') < colon) {
+            return authority.substring(0, colon);
         }
-        String host = authority;
-        int colon = host.lastIndexOf(':');
-        if (colon > 0 && host.indexOf(']') < colon) {
-            host = host.substring(0, colon);
-        }
-        for (String entry : allowed) {
-            String lower = entry.trim().toLowerCase(Locale.ROOT);
-            if (lower.equals(authority.toLowerCase(Locale.ROOT)) || lower.equals(host.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
+        return authority;
     }
 
     private static String serverAuthority(HttpServerRequest request) {
