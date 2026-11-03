@@ -1,0 +1,119 @@
+= Sitemap
+include::./includes/attributes.adoc[]
+
+The extension serves a sitemap at `/sitemap.xml`. The path is the build-time key `quarkus.seo.sitemap.path`. The
+sitemap combines three sources.
+
+== Sources
+
+Configuration::
+List paths in `quarkus.seo.sitemap.urls`.
++
+[source,properties]
+----
+quarkus.seo.sitemap.urls=/,/about,/contact
+----
+
+Annotation::
+Put `@SitemapEntry` on a JAX-RS `GET` method whose path has no template variables. A build step finds the annotation.
+The annotation can set `changefreq` and `priority`.
++
+[source,java]
+----
+@GET
+@Path("/products")
+@SitemapEntry(changefreq = "weekly", priority = 0.8)
+public TemplateInstance products() {
+    return Templates.products();
+}
+----
++
+Only the value `-1` means that `priority` is unset. Any other value must be between 0.0 and 1.0.
+
+Beans::
+Write a CDI bean that implements `SitemapContributor`. Its `urls()` method returns a `Stream<SitemapUrl>`. The
+extension reads the stream on a worker thread. The extension closes the stream after use, so a contributor can stream
+from a database cursor.
++
+[source,java]
+----
+@ApplicationScoped
+public class BlogContributor implements SitemapContributor {
+
+    @Inject
+    PostRepository posts;
+
+    @Override
+    public Stream<SitemapUrl> urls() {
+        return posts.stream().map(post -> SitemapUrl.of("/blog/" + post.slug())
+                .lastmod(post.updatedAt())
+                .alternate(Locale.FRENCH, "/fr/blog/" + post.slug()));
+    }
+}
+----
++
+If a contributor throws, the sitemap request returns a 500 response and the extension logs one ERROR message.
+
+A `SitemapUrl` holds a `loc`, which is a path or an absolute URL. It can also hold `lastmod`, `changefreq`,
+`priority`, alternates and image URLs. The extension leaves out any value that you do not set.
+
+== Use lastmod, not changefreq and priority
+
+Google ignores `changefreq` and `priority`. Google trusts `lastmod` only when it is accurate. Set `lastmod` to the
+time of the last real change of the page. If you do not know that time, set nothing. The extension never sets
+`lastmod` to the current time.
+
+== Output
+
+* Up to `quarkus.seo.sitemap.max-urls` URLs, the default is 50000, form one `urlset` at the sitemap path.
+* Above that limit, the sitemap path serves a `sitemapindex`. The pages are at `quarkus.seo.sitemap.page-path`.
+The default is `/sitemap-{n}.xml`. The token `{n}` is the page number.
+* Alternates become `xhtml:link` elements, with a link for the page itself and an `x-default` link.
+* The extension writes images with the image namespace.
+* The content type is `application/xml; charset=utf-8`.
+* Every response has an ETag. A request with a matching `If-None-Match` header gets a 304 response.
+* The `Cache-Control` header comes from `quarkus.seo.sitemap.cache-control`. The default is `public, max-age=3600`.
+* Quarkus HTTP compression compresses the sitemap when you enable it with `quarkus.http.enable-compression`.
+
+If the site is not indexable, the extension still serves the sitemap. The robots.txt then has no `Sitemap:` line.
+
+[#caching]
+== Caching
+
+Caching is off by default. To cache the generated XML:
+
+. Add `quarkus-cache` to your application.
+. Set `quarkus.seo.sitemap.cache.enabled=true`.
+
+The extension stores the output in the cache named `seo-sitemap`. The key holds the base URL, so hosts never share
+one cached output. Configure the cache with the `quarkus.cache.caffeine.seo-sitemap.*` keys or with the keys of the
+Redis or Infinispan cache. The robots.txt uses the cache `seo-robots` with `quarkus.seo.robots.cache.enabled`.
+
+If you enable the cache and `quarkus-cache` is not present, the extension logs one INFO message at startup. It then
+serves without a cache.
+
+Inject `SeoCaches` to clear the cache, for example after you publish content:
+
+[source,java]
+----
+@Inject
+SeoCaches caches;
+
+public void publish(Post post) {
+    repository.publish(post);
+    caches.invalidateSitemap();
+}
+----
+
+`SeoCaches` also has `invalidateRobots()`. The methods never block and never throw. They are safe on any thread,
+including a Vert.x event loop. They do nothing when no cache is active.
+
+== When your application serves its own sitemap
+
+If your application serves the sitemap path in any way that the build sees, the extension serves no sitemap. The build
+sees static files, JAX-RS paths and Reactive Routes. The limits on the `robots.txt` page apply here too. See
+xref:robots.adoc#when-your-application-serves-robotstxt[When your application serves robots.txt].
+
+== Switch the feature off
+
+Set `quarkus.seo.sitemap.enabled=false` at build time. The extension then registers no sitemap route.

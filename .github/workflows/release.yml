@@ -1,0 +1,203 @@
+name: Release
+
+# Publishes signed artifacts to Maven Central. Triggered by pushing a v* tag, or manually from master.
+#
+# Native image is deliberately not rebuilt here: a tag points at a commit that already went through
+# ci.yml on master, and the native build would not tell us anything new about the jars published.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      publishing_type:
+        description: 'USER_MANAGED holds the deployment in the Portal for review; AUTOMATIC releases it immediately'
+        required: true
+        default: USER_MANAGED
+        type: choice
+        options: [ USER_MANAGED, AUTOMATIC ]
+
+# Two tags pushed close together must not race each other into the Portal.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    # A manual run is only ever meant for master: dispatching from a branch would publish whatever
+    # version that branch's POM declares, and Central does not take it back.
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Fail in seconds on a misconfigured repository instead of after two builds.
+      - name: Check the release secrets
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        run: |
+          missing=0
+          for name in SIGNING_KEY SIGNING_PASSWORD CENTRAL_USERNAME CENTRAL_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The repository secret $name is not set."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      # Refuses a SNAPSHOT, a tag that does not match the POM version, and a README that still
+      # advertises a snapshot. None of these would be noticed by the build or the Portal.
+      - name: Check the release preconditions
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          ARGS=()
+          if [ "$REF_TYPE" = "tag" ]; then
+            ARGS+=("$GITHUB_REF_NAME")
+          fi
+          OUT=$(bin/release-check.sh "${ARGS[@]}") || { echo "$OUT"; exit 1; }
+          echo "$OUT"
+          echo "version=${OUT##*version=}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: mvn -B -ntp -T 4 verify
+
+      - name: Import the signing key
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::SIGNING_KEY is not set. Central rejects unsigned artifacts."
+            exit 1
+          fi
+          echo "$SIGNING_KEY" | gpg --batch --import
+
+      - name: Publish signed artifacts to the staging directory
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.SIGNING_PASSWORD }}
+        run: >
+          mvn -B -T 4 -DskipTests -Prelease deploy
+          "-DaltDeploymentRepository=staging::file://$PWD/target/staging-deploy"
+
+      # A file-repository deploy writes maven-metadata.xml*, which is not part of a Portal bundle
+      # and trips validation, so remove it before the layout check (which rejects it by design).
+      # An unsigned or partial bundle is accepted by the upload endpoint and fails minutes later,
+      # so check the layout while the log still says why.
+      - name: Verify the staged layout and signatures
+        run: |
+          find target/staging-deploy -name 'maven-metadata.xml*' -delete
+          bin/check-staging.sh target/staging-deploy
+
+      - name: Assemble the Central bundle
+        run: |
+          cd target/staging-deploy
+          zip -qr ../central-bundle.zip .
+          echo "Bundle contents:"
+          unzip -l ../central-bundle.zip
+
+      - name: Upload to the Central Portal
+        id: upload
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PUBLISHING_TYPE: ${{ inputs.publishing_type || 'USER_MANAGED' }}
+        run: |
+          if [ -z "$CENTRAL_USERNAME" ] || [ -z "$CENTRAL_PASSWORD" ]; then
+            echo "::error::CENTRAL_USERNAME / CENTRAL_PASSWORD are not set."
+            exit 1
+          fi
+          AUTH=$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)
+          DEPLOYMENT_ID=$(curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $AUTH" \
+            -F "bundle=@target/central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=quarkus-seo-${VERSION}&publishingType=${PUBLISHING_TYPE}") \
+            || { echo "$DEPLOYMENT_ID"; echo "::error::Upload to the Central Portal failed."; exit 1; }
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "::error::The Portal returned no deployment id."
+            exit 1
+          fi
+          echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          echo "Deployment ID: $DEPLOYMENT_ID (publishingType=$PUBLISHING_TYPE)"
+
+      # The upload returns as soon as the bundle is accepted, long before it is validated.
+      # Without this the job goes green on a deployment that later fails.
+      - name: Wait for validation
+        id: validation
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          DEPLOYMENT_ID: ${{ steps.upload.outputs.deployment_id }}
+        run: |
+          AUTH=$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)
+          for i in $(seq 1 40); do
+            BODY=$(curl --fail-with-body -sS -X POST \
+              -H "Authorization: Bearer $AUTH" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=${DEPLOYMENT_ID}") \
+              || { echo "$BODY"; echo "::error::Status request failed."; exit 1; }
+            STATE=$(echo "$BODY" | grep -oP '"deploymentState"\s*:\s*"\K[^"]+' || echo UNKNOWN)
+            echo "[$i] $STATE"
+            case "$STATE" in
+              PUBLISHED)
+                echo "$BODY"
+                echo "state=PUBLISHED" >> "$GITHUB_OUTPUT"
+                echo "Deployment is published; artifacts appear on Central within a few hours."
+                exit 0 ;;
+              VALIDATED)
+                echo "$BODY"
+                echo "state=VALIDATED" >> "$GITHUB_OUTPUT"
+                echo "::warning::Deployment is VALIDATED but not published (publishingType=USER_MANAGED). Nothing is on Central until you press Publish at https://central.sonatype.com/publishing/deployments"
+                exit 0 ;;
+              FAILED)
+                echo "$BODY"
+                echo "::error::Central validation failed."
+                exit 1 ;;
+              PENDING|VALIDATING|PUBLISHING|UNKNOWN) ;;
+            esac
+            sleep 15
+          done
+          echo "$BODY"
+          echo "::error::Timed out waiting for validation. Check https://central.sonatype.com/publishing/deployments"
+          exit 1
+
+      - name: Upload the bundle as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: central-bundle
+          path: target/central-bundle.zip
+          retention-days: 30
+
+      # A USER_MANAGED deployment is only validated at this point; the release stays a draft so
+      # the tag never announces artifacts that are not yet downloadable. Publish the draft once the
+      # Portal deployment is released.
+      - name: Create the GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          STATE: ${{ steps.validation.outputs.state }}
+        run: |
+          DRAFT=""
+          if [ "$STATE" != "PUBLISHED" ]; then
+            DRAFT="--draft"
+            echo "Deployment state is ${STATE:-unknown}; creating the GitHub release as a draft."
+          fi
+          gh release create "${GITHUB_REF_NAME}" $DRAFT \
+            --title "quarkus-seo ${VERSION}" \
+            --generate-notes

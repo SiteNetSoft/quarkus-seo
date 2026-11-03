@@ -1,0 +1,220 @@
+= Meta tags
+include::./includes/attributes.adoc[]
+
+The `{#seo /}` tag writes all head tags of the current page. It writes the title, the description, the canonical
+link, the hreflang links, the Open Graph tags, the Twitter card tags and the robots meta tag. It also writes the
+site verification tags, the `theme-color` tag and JSON-LD. A tag with no value is not written. The extension escapes
+every attribute value.
+
+== Set values
+
+Three layers set the values of a page. The layers are, from lowest to highest:
+
+. The configuration, such as `quarkus.seo.description`.
+. The parameters of the `{#seo}` tag.
+. The values that Java code sets on the `Seo` bean.
+
+A value from Java wins over a value from the tag. The tag often sits in a shared layout and passes the same value
+for every page. A value that Java sets belongs to one request, so it is more specific. An empty or null value counts
+as not set, on the tag and in Java.
+
+A higher layer replaces only the fields that it sets. Setting a title does not clear the image. Lists such as
+alternates and JSON-LD nodes add to the lower layer.
+
+=== Set values in the template
+
+The tag takes these parameters: `title`, `absoluteTitle`, `description`, `canonical`, `type`, `image`, `imageWidth`,
+`imageHeight`, `imageAlt`, `locale`, `noindex`, `nofollow`, `noimageindex`, `twitterCard`, `author` and `section`.
+A value can be any Qute expression.
+
+[source,html]
+----
+<head>
+  {#seo title="About us" description="Who we are" /}
+</head>
+----
+
+The boolean parameters `noindex`, `nofollow` and `noimageindex` set a directive only when the value is true. A false
+value sets nothing, so it does not lower a directive that a lower layer set.
+
+If you use two `{#seo}` tags on one page, the last tag wins. The tag stores its parameters on the request. The
+`{seo:...}` namespace and the second tag read that state. A `{seo:...}` expression that renders before the tag in
+render order sees no tag values.
+
+=== Translate titles
+
+A parameter value can be a message bundle key. The extension has no translation code of its own.
+
+[source,html]
+----
+{#seo title=msg:about_title description=msg:about_description /}
+----
+
+=== Set values in Java
+
+Inject the `Seo` bean in a request handler. The bean is request scoped. Each method returns the bean, so you can
+chain calls.
+
+[source,java]
+----
+@Inject
+Seo seo;
+
+@GET
+@Path("{slug}")
+public TemplateInstance page(@PathParam("slug") String slug) {
+    CmsPage page = cms.get(slug);
+    seo.title(page.title())
+       .description(page.summary())
+       .image(page.heroImage(), 1200, 630)
+       .locale(Locale.FRENCH)
+       .alternate(Locale.ENGLISH, "/en/" + page.enSlug());
+    return pageTemplate.data("page", page);
+}
+----
+
+The bean offers these methods:
+
+[cols="1,2"]
+|===
+|Methods |Purpose
+
+|`title`, `absoluteTitle`
+|Set the page title. `absoluteTitle` skips the title template.
+
+|`description`, `canonical`, `type`
+|Set the description, the canonical URL and the Open Graph type.
+
+|`image`, `imageAlt`
+|Set the image, with an optional width and height, and its alt text.
+
+|`locale`, `alternate`
+|Set the page locale. Add the same page in another locale.
+
+|`noindex`, `nofollow`, `noimageindex`, `maxSnippet`, `maxImagePreview`, `unavailableAfter`
+|Set the robots directives.
+
+|`published`, `modified`, `author`, `section`, `tag`
+|Set the `article:*` tags.
+
+|`twitterCard`
+|Set the Twitter card type.
+
+|`jsonLd`, `jsonLdRaw`
+|Add JSON-LD. See xref:json-ld.adoc[JSON-LD].
+
+|`meta`, `property`
+|Add any other meta tag with a `name` or a `property` attribute.
+
+|`from`
+|Copy the values of a `SeoSource`.
+|===
+
+=== Read values from a content object
+
+The `SeoSource` interface lets a content object supply its own values. Every method has a default that returns an
+empty `Optional`. An object implements only the methods for the values that it has.
+
+[source,java]
+----
+public final class CmsPage implements SeoSource {
+
+    @Override
+    public Optional<String> title() {
+        return Optional.of(headline);
+    }
+
+    @Override
+    public Optional<String> description() {
+        return Optional.of(summary);
+    }
+}
+----
+
+Call `seo.from(page)` to copy the values into the Java layer.
+
+=== Read single values in the page body
+
+The `seo:` namespace gives access to one resolved value. The values are `{seo:title}`, `{seo:description}`,
+`{seo:canonical}`, `{seo:image}`, `{seo:locale}` and `{seo:siteName}`. Each value is an empty string when it is absent.
+
+== How the extension computes values
+
+Title::
+The title template applies to the page title. The default template is `%s | {site-name}`. If the site has no name,
+the template is `%s`. If a page sets no title, the extension uses `quarkus.seo.title.default` and does not apply the
+template. An absolute title skips the template.
+
+Site name::
+The site name comes from `quarkus.seo.site-name`. If that key is not set, it comes from `quarkus.application.name`.
+
+Canonical URL::
+The default is the base URL plus the request path. The extension removes every query parameter except those in
+`quarkus.seo.canonical.keep-query-params`. A relative canonical value becomes absolute.
+
+Image and alternate URLs::
+The extension makes relative paths absolute with the base URL.
+
+`og:locale`::
+The value is the page locale or the default locale. The alternates give `og:locale:alternate`.
+
+hreflang::
+The extension writes one link per alternate, one link for the page itself and an `x-default` link. It writes the links
+only when the page has at least one alternate.
+
+Twitter card::
+The card is `summary_large_image` when the page has an image. Otherwise the card is `summary`. The extension does not
+repeat the title, the description and the image, because X falls back to Open Graph.
+
+[#locales]
+== Locales
+
+The `SeoLocales` bean supplies the locales of the site. The default bean reads them in this order:
+
+. `quarkus.seo.locales`
+. `quarkus.locales`, only when the application set it
+. `en-US`
+
+The default locale comes from `quarkus.seo.default-locale`, then from `quarkus.default-locale`. If neither is set,
+the first locale of the list is the default. The locale of the build machine is never used.
+
+If the languages of your site change at run time, provide your own `SeoLocales` bean. See
+xref:customizing.adoc[Customizing].
+
+== Robots directives and the X-Robots-Tag header
+
+When the site is not indexable, every page gets `noindex, nofollow` in the robots meta tag. The extension also sends
+the `X-Robots-Tag: noindex, nofollow` header on every response. That includes 404 responses and static files.
+
+When the site is indexable, the header carries only the directives that Java code set on `Seo`. The `{#seo}` tag
+writes its directives into the meta tag only. The response headers can already be sent when the template renders.
+The extension does not buffer response bodies. If you need the header for a page, set `noindex` in Java:
+
+[source,java]
+----
+seo.noindex();
+----
+
+== The Host header
+
+Absolute URLs need a base. The extension resolves the base in this order:
+
+. `quarkus.seo.site-url`, if you set it.
+. The scheme and host of the request, as Quarkus resolves them. Quarkus uses forwarded headers only when you enable
+`quarkus.http.proxy.*`. Otherwise it uses the plain `Host` header.
+. If you set `quarkus.seo.allowed-hosts` and the host of the request is not in the list, the first allowed host.
+
+A spoofed `Host` header can therefore reach canonical links, and a CDN can cache them. In production, set
+`quarkus.seo.site-url`. If your application serves several hosts, set `quarkus.seo.allowed-hosts`. The sitemap and
+`/robots.txt` use the same rules.
+
+== Output rules
+
+* The extension escapes `&`, `<`, `>` and both kinds of quote in every attribute value.
+* The extension writes the tags in a fixed order, one tag per line.
+* The extension does not write `<meta charset>`, `viewport` or favicon links. Your layout owns them.
+
+== Switch the feature off
+
+Set `quarkus.seo.meta.enabled=false` at build time. The extension then registers no `{#seo}` tag, no `Seo` bean and
+no X-Robots-Tag filter. Set `quarkus.seo.enabled=false` to switch every feature off.

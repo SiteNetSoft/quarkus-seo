@@ -1,0 +1,41 @@
+= Configuration reference
+include::./includes/attributes.adoc[]
+
+The `quarkus.seo.*` properties set the defaults of the extension. The keys that switch a feature on or off or set an
+output path are build-time keys. Quarkus reads all other keys at run time. Changing a build-time key needs a rebuild.
+
+Some keys fall back to a Quarkus key when you do not set them:
+
+[cols="2,2,2"]
+|===
+|SEO key |Falls back to |Final fallback
+
+|`quarkus.seo.site-name`
+|`quarkus.application.name`
+|No site name. The extension leaves out the site name tags.
+
+|`quarkus.seo.default-locale`
+|`quarkus.default-locale`
+|The first entry of the locale list.
+
+|`quarkus.seo.locales`
+|`quarkus.locales`, only when the application set it
+|`en-US`
+
+|`quarkus.seo.site-url`
+|None
+|The host of the request.
+
+|`quarkus.seo.indexable`
+|None
+|`true` in the `prod` profile, otherwise `false`.
+|===
+
+The extension uses these Quarkus keys as they are:
+
+* `quarkus.http.root-path` is the prefix of endpoints and generated links.
+* `quarkus.http.proxy.*` controls which forwarded headers Quarkus trusts.
+* `quarkus.http.enable-compression` controls gzip of the sitemap.
+* `quarkus.cache.*` configures the caches `seo-sitemap` and `seo-robots`.
+
+include::includes/quarkus-seo.adoc[leveloffset=+1]

@@ -1,0 +1,134 @@
+= Releasing
+include::./includes/attributes.adoc[]
+
+A release publishes three artifacts under `org.sitenetsoft`, all at the same version. Two modules set
+`maven.deploy.skip` and stay out of the release: `quarkus-seo-integration-tests` and `quarkus-seo-docs`.
+
+[cols="2,1,3"]
+|===
+|Coordinates |Packaging |Contents
+
+|`quarkus-seo-parent`
+|pom
+|The parent of every module.
+
+|`quarkus-seo`
+|jar
+|The runtime. Applications declare this artifact. See xref:index.adoc[Quarkus SEO].
+
+|`quarkus-seo-deployment`
+|jar
+|The build steps. Quarkus resolves it from the runtime jar, so applications never declare it.
+|===
+
+IMPORTANT: The artifact IDs must stay exactly as above. The file `META-INF/quarkus-extension.properties` in the runtime
+jar names the deployment artifact. Quarkus reads that name when it builds an application. If you rename one module
+without the other, every consumer fails at build time.
+
+== The release workflow
+
+`.github/workflows/release.yml` publishes to the https://central.sonatype.com[Central Portal]. A pushed `v*` tag
+starts it. You can also start it by hand from `master`. The workflow refuses a manual run from any other branch.
+Runs never overlap. Two tags that arrive close together therefore do not race into the Portal.
+
+The workflow runs these steps:
+
+. It checks that the four release secrets exist.
+. It runs `bin/release-check.sh`. This script refuses a `SNAPSHOT` version and a tag that differs from the POM
+version. It also refuses a README or `attributes.adoc` that still names a snapshot, and any POM that declares one.
+. It runs `mvn -T 4 verify`, which builds the project and runs every test. It does not rebuild the native image,
+because the tagged commit already passed CI.
+. It imports the signing key, because Central rejects unsigned artifacts.
+. It runs `mvn -Prelease deploy` into a file repository at `target/staging-deploy`. This step signs every jar and POM
+and attaches the sources and Javadoc jars.
+. It deletes the `maven-metadata.xml*` files, because a Portal bundle must not contain them.
+. It runs `bin/check-staging.sh`. This script checks that the staging directory holds exactly the three artifacts,
+at one version, with a signature on every POM and jar.
+. It zips the staging directory to `target/central-bundle.zip` and uploads it to the Portal. The zip stays available
+as a workflow artifact for 30 days.
+. It polls the Portal every 15 seconds until the deployment is `VALIDATED`, `PUBLISHED` or `FAILED`. It fails on
+`FAILED` or after ten minutes.
+. On a tag, it creates the GitHub release with generated notes. The release is a draft unless the deployment is
+already `PUBLISHED`.
+
+Run `bin/test-release-scripts.sh` to test the two scripts on local fixtures. The test needs Maven and its help plugin.
+
+=== Set the version
+
+The version lives in the POMs. With `-Pdocs`, the versions plugin updates the docs module too. Set the version,
+replace the snapshot version in the README and the docs, then commit, tag and push:
+
+[source,bash]
+----
+mvn -Pdocs org.codehaus.mojo:versions-maven-plugin:2.18.0:set -DnewVersion=0.1.0 -DgenerateBackupPoms=false
+sed -i 's/0.1.0-SNAPSHOT/0.1.0/g' README.md
+sed -i 's/^:project-version:.*/:project-version: 0.1.0/' docs/modules/ROOT/pages/includes/attributes.adoc
+git commit -am "Release 0.1.0" && git tag v0.1.0 && git push origin master v0.1.0
+----
+
+The first `sed` replaces every coordinate in the README. The second `sed` sets the `{project-version}` attribute that
+these pages use. `versions:set` does not touch that file. Also remove the two pre-release status sentences from the
+README by hand.
+
+Then move `master` to the next development version and push:
+
+[source,bash]
+----
+mvn -Pdocs org.codehaus.mojo:versions-maven-plugin:2.18.0:set -DnewVersion=0.2.0-SNAPSHOT -DgenerateBackupPoms=false
+git commit -am "Start 0.2.0-SNAPSHOT" && git push origin master
+----
+
+Every `-Pdocs` build filters `attributes.adoc` again from the POM version. The published docs therefore show the
+version of the build that produced them. Publish the docs from the release tag. They then show a version that users
+can download.
+
+=== Secrets
+
+[cols="1,2"]
+|===
+|Secret |Purpose
+
+|`SIGNING_KEY`
+|The ASCII-armoured private PGP key, from `gpg --armor --export-secret-keys KEY_ID`. Its public key must be on a key
+server such as `keyserver.ubuntu.com` or `keys.openpgp.org`. Otherwise Central rejects the signatures.
+
+|`SIGNING_PASSWORD`
+|The passphrase of the key. The workflow passes it to the GPG plugin as `MAVEN_GPG_PASSPHRASE`.
+
+|`CENTRAL_USERNAME`, `CENTRAL_PASSWORD`
+|A user token from the Central Portal, not the account password. Generate it under *View Account*. The account must
+own the verified `org.sitenetsoft` namespace.
+|===
+
+The build stores no credentials. Local builds need none, because signing and the sources and Javadoc jars belong to
+the `release` profile. That profile is off by default.
+
+=== Publishing type
+
+A tag push uploads with `publishingType=USER_MANAGED`. The deployment stops at *validated*. Nothing reaches Central
+until someone chooses *Publish* at https://central.sonatype.com/publishing/deployments. The workflow then creates the
+GitHub release as a draft, so the tag never announces artifacts that users cannot download. Publish the draft after
+you publish the deployment. A manual run can choose `AUTOMATIC`. That type publishes at once, and you cannot take it back.
+
+== Check before you publish
+
+Install the artifacts into your local repository:
+
+[source,bash]
+----
+mvn -T 4 install -DskipTests
+----
+
+The artifacts land in `~/.m2/repository/org/sitenetsoft/`. Build a sample application that declares only
+`org.sitenetsoft:quarkus-seo:{project-version}`. If the extension resolves and the application builds, the
+artifact IDs and the descriptor are right.
+
+To inspect the bundle without a key or credentials, repeat the staging step with signing off:
+
+[source,bash]
+----
+mvn -T 4 -DskipTests -Prelease -Dgpg.skip deploy "-DaltDeploymentRepository=staging::file://$PWD/target/staging-deploy"
+find target/staging-deploy -name 'maven-metadata.xml*' -delete
+----
+
+The staging directory then holds the files that the workflow would upload, without signatures.

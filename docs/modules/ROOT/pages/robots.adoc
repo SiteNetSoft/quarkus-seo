@@ -1,0 +1,83 @@
+= robots.txt
+include::./includes/attributes.adoc[]
+
+The extension serves `/robots.txt`. The path is fixed, because RFC 9309 says that crawlers read only that path.
+
+== Rule groups
+
+Define rule groups in the configuration. Each group has a name that you choose. The extension writes the groups in the
+alphabetical order of their names.
+
+[source,properties]
+----
+quarkus.seo.robots.groups.all.user-agents=*
+quarkus.seo.robots.groups.all.disallow=/account,/admin
+quarkus.seo.robots.groups.all.allow=/
+quarkus.seo.robots.groups.all.crawl-delay=5
+----
+
+If you define no group, the output is `User-agent: *` and `Allow: /`. If a group sets no `user-agents`, it applies to
+`*`.
+
+If the sitemap is enabled and the site is indexable, the extension adds a `Sitemap:` line with the absolute URL of
+the sitemap.
+
+If the site is not indexable, the output is `User-agent: *` and `Disallow: /`. No other configuration changes this.
+
+The response has the content type `text/plain; charset=utf-8`, an ETag and the `Cache-Control` header of the sitemap.
+
+== AI crawler presets
+
+The key `quarkus.seo.robots.ai` selects a preset. The default is `allow`.
+
+[cols="1,3"]
+|===
+|Value |Effect
+
+|`allow`
+|The extension adds nothing.
+
+|`block-training`
+|The extension disallows the training crawlers. It keeps the search and user-request crawlers.
+
+|`block-all`
+|The extension also disallows the search and user-request crawlers.
+|===
+
+The training crawlers are `GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `CCBot`, `Bytespider`,
+`Meta-ExternalAgent`, `cohere-ai` and `Amazonbot`.
+
+The search and user-request crawlers are `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`,
+`PerplexityBot` and `Perplexity-User`.
+
+A new release can update these lists. To keep your own lists, set `quarkus.seo.robots.ai-agents.training` and
+`quarkus.seo.robots.ai-agents.search`. Each key replaces the built-in list.
+
+[#root-path]
+== The root path
+
+Crawlers read `/robots.txt` at the root of the host. When `quarkus.http.root-path` is `/`, the extension serves the
+file at that path. When the root path is another value, the extension still registers the route at the host root.
+Set `quarkus.seo.robots.serve-under-root-path=true` at build time to serve the file under the root path instead.
+Use this setting when a proxy maps the host root to the application.
+
+[#when-your-application-serves-robotstxt]
+== When your application serves robots.txt
+
+If your application serves its own `/robots.txt`, the extension serves none. This holds for a static file, for a JAX-RS
+resource and for a Reactive Route. It holds under a root path other than `/` too.
+
+The build checks for the conflict. It does not see these cases:
+
+* A `@Path` value that is a regular expression or contains a template variable.
+* A `@Path` on an interface.
+* A method `@Path` in a class that has no `@Path`.
+* A `@Route(regex = ...)` value.
+* The paths of the sitemap pages.
+
+If your application serves the file in one of these ways, set `quarkus.seo.robots.enabled=false` at build time.
+
+== Edit the rules in Java
+
+A bean that implements `RobotsCustomizer` edits the rules after the configuration and the AI preset apply. See
+xref:customizing.adoc[Customizing].

@@ -1,0 +1,47 @@
+= Integrating from another extension
+include::./includes/attributes.adoc[]
+
+Quarkus SEO has no compile-time link to other extensions. Integration uses a Quarkus capability. This page is for
+authors of other extensions.
+
+== The capability
+
+Quarkus SEO declares the capability `org.sitenetsoft.seo`. An extension checks it in its deployment processor:
+
+[source,java]
+----
+@BuildStep
+void integrateSeo(Capabilities capabilities) {
+    if (capabilities.isPresent("org.sitenetsoft.seo")) {
+        // use the {#seo} tag in the templates of your extension
+    }
+}
+----
+
+The check is a string comparison. Your extension needs no dependency on `quarkus-seo`. The extension that knows the
+other one does the integration. Quarkus SEO knows nothing about other extensions.
+
+== The public contract
+
+Other extensions may rely on these parts:
+
+* The `{#seo}` tag and its parameter names.
+* The `Seo` bean API.
+* The capability name `org.sitenetsoft.seo`.
+
+A breaking change to any of these needs a new major version.
+
+== Example: quarkus-pha
+
+When the capability is present, the `layouts/_head.html` template of quarkus-pha renders `{#seo /}` in place of its own
+title and description. The page title and the `applicationPageDescription` value go to the tag as parameters.
+Nothing is lost.
+
+The setting `quarkus.pha.seo-integration=false` keeps the own head of quarkus-pha. That work happens in the
+quarkus-pha repository.
+
+== Relation to a JSON-LD processor
+
+Quarkus SEO writes schema.org JSON-LD into a page. It never reads or expands JSON-LD. A processor that reads,
+expands or signs JSON-LD is a different job. If such an extension needs the builders in
+`org.sitenetsoft.quarkus.seo.schema`, that package can move to a shared library.
