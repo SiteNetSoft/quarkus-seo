@@ -119,6 +119,28 @@ public class SeoRecorder {
     }
 
     /**
+     * Create the handler of the IndexNow key file.
+     *
+     * @param key the IndexNow key
+     * @return the handler that serves the key
+     */
+    public Handler<RoutingContext> indexNowKeyHandler(String key) {
+        return new IndexNowKeyHandler(key);
+    }
+
+    /**
+     * Create the supplier of the IndexNow key holder.
+     *
+     * @param key the IndexNow key
+     * @param underRootPath true when the key file is served under the HTTP root path
+     * @return the supplier of the holder
+     */
+    public Supplier<IndexNowKey> indexNowKey(String key, boolean underRootPath) {
+        IndexNowKey holder = new IndexNowKey(key, underRootPath);
+        return () -> holder;
+    }
+
+    /**
      * Create a route function that matches GET and HEAD requests on a path.
      *
      * @param path the exact path

@@ -159,6 +159,14 @@ public interface SeoConfig {
     Manifest manifest();
 
     /**
+     * Configure the IndexNow client.
+     *
+     * @return the IndexNow group
+     */
+    @WithName("indexnow")
+    IndexNowConfig indexNow();
+
+    /**
      * Choose which crawlers the AI preset blocks.
      */
     enum AiPreset {
@@ -479,6 +487,20 @@ public interface SeoConfig {
          * @return the hiring URL
          */
         Optional<String> hiring();
+    }
+
+    /**
+     * Keys of the IndexNow client.
+     */
+    interface IndexNowConfig {
+
+        /**
+         * Set the IndexNow endpoint that receives the submissions.
+         *
+         * @return the endpoint URL
+         */
+        @WithDefault("https://api.indexnow.org/indexnow")
+        String endpoint();
     }
 
     /**

@@ -38,6 +38,8 @@ import org.sitenetsoft.quarkus.seo.runtime.DefaultRobotsTxtProvider;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
+import org.sitenetsoft.quarkus.seo.runtime.DefaultIndexNow;
+import org.sitenetsoft.quarkus.seo.runtime.IndexNowKey;
 import org.sitenetsoft.quarkus.seo.runtime.ManifestLink;
 import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
@@ -465,6 +467,65 @@ class SeoProcessor {
         boolean underRootPath = config.securityTxt().serveUnderRootPath();
         routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
                 recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Register the IndexNow key file route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void indexNowRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.indexNow()) {
+            return;
+        }
+        routes.produce(hostRootRoute(outputs.indexNowKeyPath().get(),
+                recorder.indexNowKeyHandler(config.indexNow().key().get()), config.indexNow().serveUnderRootPath(),
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Record the IndexNow key as a bean.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @return the synthetic bean, or null when IndexNow is off
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    SyntheticBeanBuildItem indexNowKey(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!outputs.indexNow()) {
+            return null;
+        }
+        return SyntheticBeanBuildItem.configure(IndexNowKey.class)
+                .scope(Singleton.class)
+                .unremovable()
+                .supplier(recorder.indexNowKey(config.indexNow().key().get(), config.indexNow().serveUnderRootPath()))
+                .done();
+    }
+
+    /**
+     * Register the default IndexNow client.
+     *
+     * @param outputs the outputs that the extension registers
+     * @return the bean, or null when IndexNow is off
+     */
+    @BuildStep
+    AdditionalBeanBuildItem indexNowBeans(SeoOutputsBuildItem outputs) {
+        if (!outputs.indexNow()) {
+            return null;
+        }
+        return AdditionalBeanBuildItem.builder().addBeanClasses(DefaultIndexNow.class).setUnremovable().build();
     }
 
     /**

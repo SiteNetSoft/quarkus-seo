@@ -29,7 +29,7 @@ class PublicApiTest {
     void publicSignaturesExposeNoInternalType() throws Exception {
         List<String> leaks = new ArrayList<>();
         List<Class<?>> types = publicTypes();
-        assertThat(types).contains(Seo.class, SeoCaches.class, ResolvedSeo.Meta.class);
+        assertThat(types).contains(Seo.class, SeoCaches.class, ResolvedSeo.Meta.class, IndexNow.class);
         for (Class<?> type : types) {
             for (Method method : type.getDeclaredMethods()) {
                 if (visible(method.getModifiers()) && !method.isSynthetic()) {
