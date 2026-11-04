@@ -42,7 +42,7 @@ class SeoResolverTest {
     void manifestHrefComesFromTheLink() {
         TestConfig config = new TestConfig();
         SeoResolver withLink = new SeoResolver(settings(true), locales(Locale.ENGLISH), config.config(),
-                config.buildConfig(), new ManifestLink(Optional.of("/m.webmanifest")));
+                config.buildConfig(), new ManifestLink(Optional.of("/m.webmanifest")), null);
         assertThat(withLink.resolve(new SeoValues(), new SeoValues(), ABOUT).manifest())
                 .contains("/m.webmanifest");
         assertThat(resolver().resolve(new SeoValues(), new SeoValues(), ABOUT).manifest()).isEmpty();

@@ -1,5 +1,6 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -11,6 +12,7 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import org.jboss.logging.Logger;
 
 import io.quarkus.runtime.annotations.Recorder;
+import io.smallrye.config.SmallRyeConfig;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Route;
@@ -193,6 +195,17 @@ public class SeoRecorder {
         if (sitemapCache || robotsCache) {
             Logger.getLogger(SeoRecorder.class)
                     .info("quarkus.seo cache is enabled but quarkus-cache is not present. Serving without a cache.");
+        }
+    }
+
+    /**
+     * Log the security.txt content problems once at WARN.
+     */
+    public void logSecurityTxtWarnings() {
+        SeoConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class).getConfigMapping(SeoConfig.class);
+        Logger log = Logger.getLogger(SeoRecorder.class);
+        for (SeoWarning warning : SeoChecks.securityTxt(config.securityTxt(), Instant.now())) {
+            log.warn("SEO check on security.txt: " + warning.message() + " [" + warning.code() + "]");
         }
     }
 }

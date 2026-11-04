@@ -14,7 +14,7 @@ import org.sitenetsoft.quarkus.seo.ResolvedSeo;
 /**
  * Check the resolved values and the configuration for content problems.
  */
-final class SeoChecks {
+public final class SeoChecks {
 
     private static final int MAX_TITLE = 60;
     private static final int MIN_DESCRIPTION = 50;
@@ -30,7 +30,7 @@ final class SeoChecks {
      * @param seo the resolved values of the page
      * @return the warnings in a fixed order, empty when the page is clean
      */
-    static List<SeoWarning> page(ResolvedSeo seo) {
+    public static List<SeoWarning> page(ResolvedSeo seo) {
         List<SeoWarning> warnings = new ArrayList<>();
         String title = seo.title() == null ? "" : seo.title();
         int titleLength = title.codePointCount(0, title.length());
@@ -125,7 +125,7 @@ final class SeoChecks {
      * @param now the current time
      * @return the warnings about the expiry, empty when it is far enough away
      */
-    static List<SeoWarning> securityTxt(SeoConfig.SecurityTxt config, Instant now) {
+    public static List<SeoWarning> securityTxt(SeoConfig.SecurityTxt config, Instant now) {
         Optional<String> value = config.expires().filter(text -> !text.isBlank());
         if (value.isEmpty()) {
             return List.of(new SeoWarning("security-txt-expires-missing",
