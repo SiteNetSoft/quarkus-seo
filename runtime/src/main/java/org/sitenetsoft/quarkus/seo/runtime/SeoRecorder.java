@@ -89,6 +89,15 @@ public class SeoRecorder {
     }
 
     /**
+     * Create the handler of llms.txt.
+     *
+     * @return the handler that serves the file
+     */
+    public Handler<RoutingContext> llmsTxtHandler() {
+        return new LlmsTxtHandler();
+    }
+
+    /**
      * Create the handler of security.txt.
      *
      * @param underRootPath true when the route sits under the HTTP root path

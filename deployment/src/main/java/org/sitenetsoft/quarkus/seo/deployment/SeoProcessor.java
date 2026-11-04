@@ -213,7 +213,7 @@ class SeoProcessor {
     @BuildStep
     void cacheBeans(SeoOutputsBuildItem outputs, Capabilities capabilities,
             BuildProducer<AdditionalBeanBuildItem> beans) {
-        if (!outputs.sitemap() && !outputs.robots()) {
+        if (!outputs.sitemap() && !outputs.robots() && !outputs.llmsTxt()) {
             return;
         }
         beans.produce(AdditionalBeanBuildItem.builder().addBeanClasses(SeoCaches.class).setUnremovable().build());
@@ -236,7 +236,7 @@ class SeoProcessor {
     @BuildStep
     AdditionalIndexedClassesBuildItem indexCacheClass(SeoBuildConfig config, Capabilities capabilities) {
         if (!capabilities.isPresent(Capability.CACHE) || !config.enabled()
-                || !(config.sitemap().enabled() || config.robots().enabled())) {
+                || !(config.sitemap().enabled() || config.robots().enabled() || config.llmsTxt().enabled())) {
             return null;
         }
         return new AdditionalIndexedClassesBuildItem(CACHE_MANAGER_CLASS);
@@ -261,12 +261,15 @@ class SeoProcessor {
     /**
      * Register the sitemap writer and the sitemap service.
      *
+     * <p>
+     * llms.txt reads the same sources, so the beans also exist when the extension serves only llms.txt.
+     *
      * @param outputs the outputs that the extension registers
-     * @return the beans, or null when the extension does not serve the sitemap
+     * @return the beans, or null when the extension serves neither the sitemap nor llms.txt
      */
     @BuildStep
     AdditionalBeanBuildItem sitemapBeans(SeoOutputsBuildItem outputs) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
@@ -285,7 +288,7 @@ class SeoProcessor {
     @BuildStep
     void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index,
             BuildProducer<SitemapEntryBuildItem> entries) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return;
         }
         for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index))) {
@@ -299,13 +302,13 @@ class SeoProcessor {
      * @param recorder the recorder
      * @param outputs the outputs that the extension registers
      * @param entries the entries found at build time
-     * @return the synthetic bean, or null when the extension does not serve the sitemap
+     * @return the synthetic bean, or null when the extension serves neither the sitemap nor llms.txt
      */
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
     SyntheticBeanBuildItem sitemapEntriesBean(SeoRecorder recorder, SeoOutputsBuildItem outputs,
             List<SitemapEntryBuildItem> entries) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return null;
         }
         List<String> paths = new ArrayList<>();
@@ -466,6 +469,29 @@ class SeoProcessor {
         }
         boolean underRootPath = config.securityTxt().serveUnderRootPath();
         routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Register the llms.txt route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void llmsTxtRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.llmsTxt()) {
+            return;
+        }
+        routes.produce(hostRootRoute(LLMS_TXT_PATH, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
