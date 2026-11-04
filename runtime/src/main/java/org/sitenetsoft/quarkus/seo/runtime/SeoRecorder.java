@@ -88,6 +88,16 @@ public class SeoRecorder {
     }
 
     /**
+     * Create the handler of security.txt.
+     *
+     * @param underRootPath true when the route sits under the HTTP root path
+     * @return the handler that serves the file
+     */
+    public Handler<RoutingContext> securityTxtHandler(boolean underRootPath) {
+        return new SecurityTxtHandler(underRootPath);
+    }
+
+    /**
      * Create a route function that matches GET and HEAD requests on a path.
      *
      * @param path the exact path

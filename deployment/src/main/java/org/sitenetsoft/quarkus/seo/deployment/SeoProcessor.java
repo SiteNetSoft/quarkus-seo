@@ -391,6 +391,30 @@ class SeoProcessor {
     }
 
     /**
+     * Register the security.txt route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true. It registers no bean.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void securityTxtRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.securityTxt()) {
+            return;
+        }
+        boolean underRootPath = config.securityTxt().serveUnderRootPath();
+        routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
      * Build a route that sits on the host root unless the output is served under the root path.
      *
      * @param path the output path

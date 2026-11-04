@@ -44,4 +44,12 @@ class UrlsTest {
         assertThat(Urls.isSafeHost("ex.com\"><script>")).isFalse();
         assertThat(Urls.isSafeHost("")).isFalse();
     }
+
+    @Test
+    void hostRootKeepsSchemeAndAuthorityOnly() {
+        assertThat(Urls.hostRoot("https://ex.com/app")).isEqualTo("https://ex.com");
+        assertThat(Urls.hostRoot("http://localhost:8080/")).isEqualTo("http://localhost:8080");
+        assertThat(Urls.hostRoot("https://ex.com")).isEqualTo("https://ex.com");
+        assertThat(Urls.hostRoot("https://ex.com?x=1")).isEqualTo("https://ex.com");
+    }
 }

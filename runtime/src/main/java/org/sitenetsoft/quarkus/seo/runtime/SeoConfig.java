@@ -145,6 +145,13 @@ public interface SeoConfig {
     Robots robots();
 
     /**
+     * Configure the security.txt content.
+     *
+     * @return the security.txt group
+     */
+    SecurityTxt securityTxt();
+
+    /**
      * Choose which crawlers the AI preset blocks.
      */
     enum AiPreset {
@@ -416,6 +423,55 @@ public interface SeoConfig {
          * @return the crawler tokens
          */
         Optional<List<String>> search();
+    }
+
+    /**
+     * Keys of the security.txt content.
+     */
+    interface SecurityTxt {
+
+        /**
+         * List the contact URIs. A value without a scheme that holds an at sign gets the {@code mailto:} scheme.
+         * Without a contact, the path answers 404.
+         *
+         * @return the contacts
+         */
+        Optional<List<String>> contact();
+
+        /**
+         * Set the expiry date as an ISO 8601 date or date-time. A value that does not parse is left out.
+         *
+         * @return the expiry
+         */
+        Optional<String> expires();
+
+        /**
+         * Set the URL of the encryption key.
+         *
+         * @return the key URL
+         */
+        Optional<String> encryption();
+
+        /**
+         * Set the URL of the disclosure policy.
+         *
+         * @return the policy URL
+         */
+        Optional<String> policy();
+
+        /**
+         * List the preferred languages as language tags.
+         *
+         * @return the language tags
+         */
+        Optional<List<String>> preferredLanguages();
+
+        /**
+         * Set the URL of the hiring page.
+         *
+         * @return the hiring URL
+         */
+        Optional<String> hiring();
     }
 
     /**
