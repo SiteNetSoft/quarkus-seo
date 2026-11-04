@@ -26,6 +26,7 @@ import java.util.Optional;
  * @param themeColor the theme color
  * @param extraMeta the extra meta tags
  * @param jsonLd the JSON-LD text, or an empty string when there is none
+ * @param manifest the href of the manifest link, or empty when the page writes none
  */
 public record ResolvedSeo(
         String title,
@@ -46,7 +47,8 @@ public record ResolvedSeo(
         List<Meta> verification,
         Optional<String> themeColor,
         List<Meta> extraMeta,
-        String jsonLd) {
+        String jsonLd,
+        Optional<String> manifest) {
 
     /**
      * Hold one alternate language link.

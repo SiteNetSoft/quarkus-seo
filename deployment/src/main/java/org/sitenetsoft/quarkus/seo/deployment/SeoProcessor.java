@@ -38,6 +38,7 @@ import org.sitenetsoft.quarkus.seo.runtime.DefaultRobotsTxtProvider;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
+import org.sitenetsoft.quarkus.seo.runtime.ManifestLink;
 import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
@@ -347,6 +348,58 @@ class SeoProcessor {
                 .handler(recorder.sitemapPageHandler())
                 .handlerType(HandlerType.BLOCKING)
                 .build());
+    }
+
+    /**
+     * Register the web manifest route under the HTTP root path.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void manifestRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.manifest()) {
+            return;
+        }
+        routes.produce(RouteBuildItem.builder()
+                .routeFunction(recorder.getRoute(SeoPaths.normalize(config.manifest().path())))
+                .handler(recorder.manifestHandler())
+                .handlerType(HandlerType.NORMAL)
+                .build());
+    }
+
+    /**
+     * Record the href of the manifest link as a bean.
+     *
+     * <p>
+     * The href is empty when the extension serves no manifest.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @return the synthetic bean, or null when the meta feature is switched off
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    SyntheticBeanBuildItem manifestLink(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!outputs.meta()) {
+            return null;
+        }
+        String href = "";
+        if (outputs.manifest()) {
+            String rootPath = SeoSettings.normalizeRootPath(ConfigProvider.getConfig()
+                    .getOptionalValue("quarkus.http.root-path", String.class).orElse("/"));
+            href = rootPath + SeoPaths.normalize(config.manifest().path());
+        }
+        return SyntheticBeanBuildItem.configure(ManifestLink.class)
+                .scope(Singleton.class)
+                .unremovable()
+                .supplier(recorder.manifestLink(href))
+                .done();
     }
 
     /**

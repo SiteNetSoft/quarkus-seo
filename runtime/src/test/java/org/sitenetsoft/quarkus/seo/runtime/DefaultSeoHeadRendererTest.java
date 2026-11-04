@@ -20,7 +20,8 @@ class DefaultSeoHeadRendererTest {
     private static ResolvedSeo minimal(String title) {
         return new ResolvedSeo(title, Optional.empty(), List.of(), Optional.empty(), List.of(), "website",
                 Optional.of(title), Optional.empty(), "en_US", List.of(), Optional.empty(), Optional.empty(),
-                "summary", Optional.empty(), Optional.empty(), List.of(), Optional.empty(), List.of(), "");
+                "summary", Optional.empty(), Optional.empty(), List.of(), Optional.empty(), List.of(), "",
+                Optional.empty());
     }
 
     private static ResolvedSeo full() {
@@ -35,7 +36,7 @@ class DefaultSeoHeadRendererTest {
                         List.of("a", "b"))),
                 "summary_large_image", Optional.of("@site"), Optional.of("@ann"),
                 List.of(new Meta("name", "google-site-verification", "abc")), Optional.of("#ffffff"),
-                List.of(new Meta("property", "fb:app_id", "42")), "{\"@type\":\"Article\"}");
+                List.of(new Meta("property", "fb:app_id", "42")), "{\"@type\":\"Article\"}", Optional.empty());
     }
 
     @Test
@@ -111,11 +112,27 @@ class DefaultSeoHeadRendererTest {
         assertThat(renderer.render(minimal("Home"))).doesNotContain("<script");
     }
 
+    @Test
+    void manifestLinkAfterThemeColor() {
+        ResolvedSeo m = minimal("Home");
+        ResolvedSeo seo = new ResolvedSeo(m.title(), m.description(), m.robots(), m.canonical(), m.hreflang(),
+                m.type(), m.ogTitle(), m.siteName(), m.ogLocale(), m.ogLocaleAlternates(), m.image(), m.article(),
+                m.twitterCard(), m.twitterSite(), m.twitterCreator(), m.verification(), Optional.of("#fff"),
+                List.of(new Meta("name", "x", "y")), m.jsonLd(), Optional.of("/app/manifest.webmanifest"));
+        assertThat(renderer.render(seo)).contains("<meta name=\"theme-color\" content=\"#fff\">\n"
+                + "<link rel=\"manifest\" href=\"/app/manifest.webmanifest\">\n<meta name=\"x\"");
+    }
+
+    @Test
+    void noManifestLinkWhenAbsent() {
+        assertThat(renderer.render(minimal("Home"))).doesNotContain("rel=\"manifest\"");
+    }
+
     private static ResolvedSeo withImage(Image image) {
         ResolvedSeo m = minimal("Home");
         return new ResolvedSeo(m.title(), m.description(), m.robots(), m.canonical(), m.hreflang(), m.type(),
                 m.ogTitle(), m.siteName(), m.ogLocale(), m.ogLocaleAlternates(), Optional.of(image), m.article(),
                 m.twitterCard(), m.twitterSite(), m.twitterCreator(), m.verification(), m.themeColor(),
-                m.extraMeta(), m.jsonLd());
+                m.extraMeta(), m.jsonLd(), m.manifest());
     }
 }

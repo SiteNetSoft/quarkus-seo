@@ -117,7 +117,13 @@ public class SeoSettings {
         return configured.orElse(activeProfiles.contains("prod"));
     }
 
-    static String normalizeRootPath(String value) {
+    /**
+     * Normalize an HTTP root path.
+     *
+     * @param value the configured root path, or null
+     * @return the path with a leading slash and no trailing slash, or an empty string for {@code /}
+     */
+    public static String normalizeRootPath(String value) {
         if (value == null) {
             return "";
         }

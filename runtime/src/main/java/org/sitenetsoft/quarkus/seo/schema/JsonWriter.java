@@ -10,8 +10,11 @@ import java.util.List;
 
 /**
  * Writes JSON text for schema values.
+ *
+ * <p>
+ * This class is internal. Application code does not use it.
  */
-final class JsonWriter {
+public final class JsonWriter {
 
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
@@ -89,10 +92,13 @@ final class JsonWriter {
     /**
      * Appends a quoted and escaped JSON string.
      *
+     * <p>
+     * The method escapes the less-than sign, so the text stays safe inside a script element.
+     *
      * @param out the target
      * @param text the text to quote
      */
-    static void string(StringBuilder out, String text) {
+    public static void string(StringBuilder out, String text) {
         out.append('"');
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);

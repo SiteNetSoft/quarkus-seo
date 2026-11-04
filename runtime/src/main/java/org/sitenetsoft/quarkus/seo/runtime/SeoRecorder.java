@@ -1,6 +1,7 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -95,6 +96,26 @@ public class SeoRecorder {
      */
     public Handler<RoutingContext> securityTxtHandler(boolean underRootPath) {
         return new SecurityTxtHandler(underRootPath);
+    }
+
+    /**
+     * Create the handler of the web manifest.
+     *
+     * @return the handler that serves the manifest
+     */
+    public Handler<RoutingContext> manifestHandler() {
+        return new ManifestHandler();
+    }
+
+    /**
+     * Create the supplier of the manifest link holder.
+     *
+     * @param href the href of the link, or an empty string when the extension serves no manifest
+     * @return the supplier of the holder
+     */
+    public Supplier<ManifestLink> manifestLink(String href) {
+        ManifestLink link = new ManifestLink(href.isEmpty() ? Optional.empty() : Optional.of(href));
+        return () -> link;
     }
 
     /**

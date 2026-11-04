@@ -152,6 +152,13 @@ public interface SeoConfig {
     SecurityTxt securityTxt();
 
     /**
+     * Configure the web manifest content.
+     *
+     * @return the manifest group
+     */
+    Manifest manifest();
+
+    /**
      * Choose which crawlers the AI preset blocks.
      */
     enum AiPreset {
@@ -472,6 +479,103 @@ public interface SeoConfig {
          * @return the hiring URL
          */
         Optional<String> hiring();
+    }
+
+    /**
+     * Choose the display mode of the web manifest.
+     */
+    enum Display {
+        /** Use the whole screen. */
+        FULLSCREEN,
+        /** Look like a standalone application. */
+        STANDALONE,
+        /** Look like a standalone application with a minimal set of browser controls. */
+        MINIMAL_UI,
+        /** Open in a browser tab. */
+        BROWSER
+    }
+
+    /**
+     * Keys of the web manifest content.
+     */
+    interface Manifest {
+
+        /**
+         * Set the application name. When unset, the site name applies.
+         *
+         * @return the name
+         */
+        Optional<String> name();
+
+        /**
+         * Set the short application name.
+         *
+         * @return the short name
+         */
+        Optional<String> shortName();
+
+        /**
+         * Set the start URL. A value that starts with a slash gets the HTTP root path in front. When unset, the
+         * start URL is the root path.
+         *
+         * @return the start URL
+         */
+        Optional<String> startUrl();
+
+        /**
+         * Set the display mode.
+         *
+         * @return the display mode
+         */
+        Optional<Display> display();
+
+        /**
+         * Set the theme color. When unset, {@code quarkus.seo.theme-color} applies.
+         *
+         * @return the color
+         */
+        Optional<String> themeColor();
+
+        /**
+         * Set the background color.
+         *
+         * @return the color
+         */
+        Optional<String> backgroundColor();
+
+        /**
+         * Define icons by name. The manifest lists them in the order of their names.
+         *
+         * @return the icons
+         */
+        Map<String, Icon> icons();
+    }
+
+    /**
+     * Keys of one web manifest icon.
+     */
+    interface Icon {
+
+        /**
+         * Set the icon URL. A value that starts with a slash gets the HTTP root path in front.
+         *
+         * @return the URL
+         */
+        String src();
+
+        /**
+         * Set the icon sizes, for example {@code 192x192}.
+         *
+         * @return the sizes
+         */
+        Optional<String> sizes();
+
+        /**
+         * Set the media type of the icon.
+         *
+         * @return the media type
+         */
+        Optional<String> type();
     }
 
     /**
