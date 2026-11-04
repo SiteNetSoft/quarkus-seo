@@ -68,7 +68,7 @@ public final class SeoChecks {
      * @param alternatesByUrl the alternate links of the pages that were fetched, by URL
      * @return one warning for each alternate page without a return link
      */
-    static List<SeoWarning> oneWayHreflang(String pageUrl, List<ResolvedSeo.Link> links,
+    public static List<SeoWarning> oneWayHreflang(String pageUrl, List<ResolvedSeo.Link> links,
             Map<String, List<ResolvedSeo.Link>> alternatesByUrl) {
         List<SeoWarning> warnings = new ArrayList<>();
         for (ResolvedSeo.Link link : links) {
@@ -100,7 +100,7 @@ public final class SeoChecks {
      * @param titleByUrl the title of each page, by URL
      * @return one warning for each repeated title, which names every URL
      */
-    static List<SeoWarning> duplicateTitles(Map<String, String> titleByUrl) {
+    public static List<SeoWarning> duplicateTitles(Map<String, String> titleByUrl) {
         Map<String, List<String>> urlsByTitle = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : titleByUrl.entrySet()) {
             String title = entry.getValue();
