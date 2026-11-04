@@ -496,15 +496,18 @@ class SeoProcessor {
     /**
      * Record the IndexNow key as a bean.
      *
+     * <p>
+     * The bean exists whenever IndexNow is on, also when the application serves the key file itself.
+     *
      * @param recorder the recorder
      * @param config the build-time configuration
-     * @param outputs the outputs that the extension registers
-     * @return the synthetic bean, or null when IndexNow is off
+     * @param outputs the outputs, which carry the key check
+     * @return the synthetic bean, or null when the extension or IndexNow is off
      */
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
     SyntheticBeanBuildItem indexNowKey(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
-        if (!outputs.indexNow()) {
+        if (!indexNowClient(config)) {
             return null;
         }
         return SyntheticBeanBuildItem.configure(IndexNowKey.class)
@@ -517,12 +520,16 @@ class SeoProcessor {
     /**
      * Register the default IndexNow client.
      *
-     * @param outputs the outputs that the extension registers
-     * @return the bean, or null when IndexNow is off
+     * <p>
+     * The bean exists whenever IndexNow is on, also when the application serves the key file itself.
+     *
+     * @param config the build-time configuration
+     * @param outputs the outputs, which carry the key check
+     * @return the bean, or null when the extension or IndexNow is off
      */
     @BuildStep
-    AdditionalBeanBuildItem indexNowBeans(SeoOutputsBuildItem outputs) {
-        if (!outputs.indexNow()) {
+    AdditionalBeanBuildItem indexNowBeans(SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!indexNowClient(config)) {
             return null;
         }
         return AdditionalBeanBuildItem.builder().addBeanClasses(DefaultIndexNow.class).setUnremovable().build();
@@ -552,6 +559,13 @@ class SeoProcessor {
                 .handler(handler)
                 .handlerType(HandlerType.BLOCKING)
                 .build();
+    }
+
+    /**
+     * Tell whether the extension registers the IndexNow client: the master switch and the IndexNow switch are on.
+     */
+    private static boolean indexNowClient(SeoBuildConfig config) {
+        return config.enabled() && config.indexNow().enabled();
     }
 
     /**

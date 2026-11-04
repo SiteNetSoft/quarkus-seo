@@ -7,9 +7,10 @@ import java.util.concurrent.CompletionStage;
  * Tell IndexNow search engines that URLs changed.
  *
  * <p>
- * The bean exists when {@code quarkus.seo.indexnow.enabled} is true. The extension does nothing when the site is not
- * indexable or when {@code quarkus.seo.site-url} is unset, because a background job has no request to take a host
- * from.
+ * The bean exists when {@code quarkus.seo.enabled} and {@code quarkus.seo.indexnow.enabled} are both true. It exists
+ * also when the application serves the key file itself, because the application file only replaces the key route.
+ * The extension does nothing when the site is not indexable or when {@code quarkus.seo.site-url} is unset, because a
+ * background job has no request to take a host from.
  */
 public interface IndexNow {
 
