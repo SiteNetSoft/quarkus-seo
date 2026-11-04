@@ -1,0 +1,63 @@
+= Testing
+include::./includes/attributes.adoc[]
+
+This page covers the tests of the extension and the tests that check the SEO output of your own application.
+
+== The tests of the extension
+
+Unit tests::
+The `runtime` module tests the merge order, the title template, the canonical rules, escaping, the JSON-LD output, the
+sitemap XML and the robots output for each preset. `SchemaPackageIsolationTest` checks that the package
+`org.sitenetsoft.quarkus.seo.schema` imports only `java.*`.
+
+Deployment tests::
+The `deployment` module uses `QuarkusUnitTest`. These tests cover each switch, the conflict check with a static file, a
+JAX-RS resource and a Reactive Route, `@SitemapEntry` discovery, the configuration fallbacks, the `indexable` default
+per profile, `allowed-hosts`, sitemap splitting and caching without `quarkus-cache`.
+
+Integration tests::
+The `integration-tests` module is a small application with Qute pages, a JAX-RS handler that uses `Seo`, a
+contributor and the sitemap cache. `SeoResourceTest` runs it in JVM mode. `SeoResourceIT` runs the same checks
+against the packaged application. Under the `native` profile it runs them against the native binary. See
+xref:native.adoc[Native].
+
+Run the tests with Maven:
+
+[source,bash]
+----
+mvn -T 4 verify
+----
+
+== Test the SEO output of your application
+
+Fetch a page in a `@QuarkusTest` and assert on the head tags. The test needs `quarkus-junit`, `rest-assured` and
+`assertj-core` in the test scope.
+
+[source,java]
+----
+@QuarkusTest
+class AboutPageTest {
+
+    @Test
+    void aboutPageHasSeoTags() {
+        String html = given().when().get("/about").then().statusCode(200).extract().asString();
+
+        assertThat(html).contains("<title>About us | Example</title>");
+        assertThat(html).contains("<link rel=\"canonical\" href=\"https://example.org/about\">");
+    }
+
+    @Test
+    void sitemapListsThePage() {
+        String xml = given().when().get("/sitemap.xml").then().statusCode(200).extract().asString();
+
+        assertThat(xml).contains("<loc>https://example.org/about</loc>");
+    }
+}
+----
+
+Set `quarkus.seo.site-url` in `src/test/resources/application.properties`. Without it, the base URL follows the
+`Host` header of the test request.
+
+The test profile is not the `prod` profile, so the site is not indexable. Every page then has `noindex, nofollow` and
+`/robots.txt` disallows the whole site. To test the indexable output, set `quarkus.seo.indexable=true` in a test
+profile.

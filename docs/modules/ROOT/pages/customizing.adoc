@@ -1,0 +1,97 @@
+= Customizing
+include::./includes/attributes.adoc[]
+
+Every replaceable service is an interface with a `@DefaultBean` implementation. To replace one, write a CDI bean that
+implements the interface. Quarkus then uses your bean in place of the default.
+
+[cols="1,3"]
+|===
+|Interface |Replace it to
+
+|`SeoLocales`
+|Supply the locales of the site. Use this when the languages change at run time, for example when they come from a
+database. The sitemap, the hreflang links and `og:locale` follow your bean.
+
+|`SeoHeadRenderer`
+|Write the head tags in your own way. The `{#seo}` tag calls this bean.
+
+|`SitemapWriter`
+|Write the sitemap XML in your own way.
+
+|`RobotsTxtProvider`
+|Write the whole `/robots.txt` file.
+
+|`BaseUrlResolver`
+|Decide the public base URL of each request. Use this when you know the public address better than the request does.
+|===
+
+[source,java]
+----
+@ApplicationScoped
+public class DatabaseLocales implements SeoLocales {
+
+    @Inject
+    LanguageRepository languages;
+
+    @Override
+    public List<Locale> locales() {
+        return languages.enabled().stream().map(Language::locale).toList();
+    }
+
+    @Override
+    public Locale defaultLocale() {
+        return languages.primary().locale();
+    }
+}
+----
+
+== Edit robots.txt rules
+
+`RobotsCustomizer` is not a replacement. It is an extra step. The default `RobotsTxtProvider` builds the rules from
+the configuration and the AI preset. It then calls every `RobotsCustomizer` bean. Each bean edits the `RobotsRules`
+object.
+
+[source,java]
+----
+@ApplicationScoped
+public class PrivateAreaRobots implements RobotsCustomizer {
+
+    @Override
+    public void customize(RobotsRules rules) {
+        rules.groups().add(new RobotsGroup(List.of("*")).disallow("/members"));
+        rules.sitemaps().add("https://example.org/news-sitemap.xml");
+    }
+}
+----
+
+The customizer runs only when the site is indexable. If you replace `RobotsTxtProvider`, your bean owns the
+whole file and no customizer runs.
+
+== Add URLs to the sitemap
+
+`SitemapContributor` is not a replacement either. The extension calls every contributor bean. See
+xref:sitemap.adoc[Sitemap].
+
+== Switch features off
+
+Each feature has a build-time switch. A switched-off feature leaves no route, bean or filter in your application.
+
+[cols="2,3"]
+|===
+|Key |Switches off
+
+|`quarkus.seo.enabled`
+|Every feature.
+
+|`quarkus.seo.meta.enabled`
+|The `{#seo}` tag, the `Seo` bean and the X-Robots-Tag filter.
+
+|`quarkus.seo.json-ld.enabled`
+|JSON-LD output.
+
+|`quarkus.seo.sitemap.enabled`
+|The sitemap.
+
+|`quarkus.seo.robots.enabled`
+|The `/robots.txt` file.
+|===

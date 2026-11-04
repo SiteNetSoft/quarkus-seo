@@ -1,0 +1,87 @@
+= Quarkus SEO
+include::./includes/attributes.adoc[]
+
+Search engines and social networks read the `<head>` of a page. They read `/sitemap.xml` and `/robots.txt` too.
+Many applications write these outputs by hand. A hard-coded slug list builds the sitemap. A fixed string is the
+robots.txt. Every controller passes its own title and description to the template.
+
+This extension produces these outputs for you. It writes the title, description, canonical, hreflang, Open Graph and
+Twitter tags of a page. It writes JSON-LD. It serves a sitemap and a robots.txt. Every part has a default. Every part
+accepts configuration, a replacement bean or a switch.
+
+== Installation
+
+Add the runtime artifact to your application. Quarkus resolves the deployment artifact for you.
+
+[source,xml,subs=attributes+]
+----
+<dependency>
+    <groupId>org.sitenetsoft</groupId>
+    <artifactId>quarkus-seo</artifactId>
+    <version>{project-version}</version>
+</dependency>
+----
+
+The extension depends on `quarkus-arc`, `quarkus-vertx-http` and `quarkus-qute`. The extension uses `quarkus-cache`
+only when your application has it. See xref:sitemap.adoc#caching[Caching].
+
+== Quick start
+
+Set the public address of your site in `application.properties`:
+
+[source,properties]
+----
+quarkus.seo.site-url=https://example.org
+quarkus.seo.site-name=Example
+----
+
+Put the `{#seo /}` tag in the `<head>` of your base template:
+
+[source,html]
+----
+<head>
+  <meta charset="utf-8">
+  {#seo /}
+</head>
+----
+
+Every page now has a title, a canonical link and the social tags. The site serves `/sitemap.xml` and `/robots.txt`
+without more code.
+
+A page that sets its own values injects the `Seo` bean:
+
+[source,java]
+----
+@Inject
+Seo seo;
+
+@GET
+@Path("{slug}")
+@Produces("text/html")
+public TemplateInstance page(@PathParam("slug") String slug) {
+    CmsPage page = cms.get(slug);
+    seo.title(page.title()).description(page.summary());
+    return Templates.page(page);
+}
+----
+
+== Defaults you should know
+
+* The site is indexable in the `prod` profile only. In every other profile each page gets `noindex, nofollow`, and
+`/robots.txt` disallows the whole site.
+* If you set no `quarkus.seo.site-url`, the extension builds absolute URLs from the `Host` header of the request.
+Set `site-url` or `allowed-hosts` in production. See xref:meta-tags.adoc#the-host-header[The Host header].
+* If your application serves its own `/robots.txt` or `/sitemap.xml`, the extension serves none. See
+xref:robots.adoc#when-your-application-serves-robotstxt[When your application serves robots.txt].
+* The extension never fails startup because of missing SEO configuration.
+
+== Where to go next
+
+* xref:meta-tags.adoc[Meta tags]: the `{#seo}` tag, the `Seo` bean and the merge order.
+* xref:json-ld.adoc[JSON-LD]: the schema.org builders.
+* xref:sitemap.adoc[Sitemap]: the three sources, splitting and caching.
+* xref:robots.adoc[robots.txt]: rule groups and the AI crawler presets.
+* xref:customizing.adoc[Customizing]: replace any part with your own bean.
+* xref:integrating.adoc[Integrating from another extension]: use the extension through a capability.
+* xref:native.adoc[Native], xref:testing.adoc[Testing] and xref:releasing.adoc[Releasing].
+* xref:configuration.adoc[Configuration reference].

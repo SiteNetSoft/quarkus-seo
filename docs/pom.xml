@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.sitenetsoft</groupId>
+    <artifactId>quarkus-seo-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>quarkus-seo-docs</artifactId>
+  <packaging>pom</packaging>
+  <name>SEO - Documentation</name>
+
+  <properties>
+    <maven.deploy.skip>true</maven.deploy.skip>
+    <asciidoctor-plugin.version>3.2.0</asciidoctor-plugin.version>
+    <asciidoctorj.version>3.0.1</asciidoctorj.version>
+    <resources-plugin.version>3.3.1</resources-plugin.version>
+  </properties>
+
+  <dependencies>
+    <!-- The config reference is generated from the extension modules' build output, so they build first -->
+    <dependency>
+      <groupId>org.sitenetsoft</groupId>
+      <artifactId>quarkus-seo-deployment</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-config-doc-maven-plugin</artifactId>
+        <version>${quarkus.version}</version>
+        <executions>
+          <execution>
+            <id>generate-config-doc</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>generate-config-doc</goal>
+            </goals>
+            <configuration>
+              <targetDirectory>${project.basedir}/modules/ROOT/pages/includes/</targetDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>${resources-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>copy-attributes</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.basedir}/modules/ROOT/pages/includes/</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/templates/includes</directory>
+                  <include>attributes.adoc</include>
+                  <filtering>true</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.asciidoctor</groupId>
+        <artifactId>asciidoctor-maven-plugin</artifactId>
+        <version>${asciidoctor-plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.asciidoctor</groupId>
+            <artifactId>asciidoctorj</artifactId>
+            <version>${asciidoctorj.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <enableVerbose>true</enableVerbose>
+          <logHandler>
+            <failIf>
+              <severity>WARN</severity>
+            </failIf>
+          </logHandler>
+          <sourceDirectory>${project.basedir}/modules/ROOT/pages/</sourceDirectory>
+          <preserveDirectories>true</preserveDirectories>
+          <attributes>
+            <icons>font</icons>
+            <sectanchors>true</sectanchors>
+            <idprefix />
+            <idseparator>-</idseparator>
+            <!-- Antora xrefs point at .adoc pages; the standalone HTML links to .html -->
+            <relfilesuffix>.html</relfilesuffix>
+          </attributes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>output-html</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>process-asciidoc</goal>
+            </goals>
+            <configuration>
+              <backend>html5</backend>
+              <attributes>
+                <source-highlighter>coderay</source-highlighter>
+                <linkcss>true</linkcss>
+                <copycss>true</copycss>
+              </attributes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,22 @@
+= Native
+include::./includes/attributes.adoc[]
+
+The extension needs no configuration for a native image. It needs no extra registration of classes or resources.
+
+The integration tests prove this. The sample application in `integration-tests` has Qute pages, a JAX-RS handler that
+uses `Seo`, a sitemap contributor and the sitemap cache. `SeoResourceTest` runs against the application in JVM mode.
+`SeoResourceIT` runs the same checks against the packaged application. Under the `native` profile, it runs them
+against the native binary. The tests ran in a Mandrel 25 container build.
+
+The `native` job in `.github/workflows/ci.yml` runs the native integration test on every push and pull request to
+`master`. It starts after the `build` job succeeds. The job builds the native image in a container. It passes
+`-J-XX:TieredStopAtLevel=1` and `--parallelism=8` to the native build. To run the test yourself:
+
+[source,bash]
+----
+mvn -B -ntp -pl integration-tests -am verify -Dnative -Dquarkus.native.container-build=true \
+  -Dquarkus.native.additional-build-args=-J-XX:TieredStopAtLevel=1,--parallelism=8
+----
+
+A native build uses much memory and many threads. Run it on a machine that has no other heavy job. The two build
+arguments above limit the load of the build.

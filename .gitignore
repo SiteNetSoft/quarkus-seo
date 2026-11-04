@@ -1,0 +1,5 @@
+target/
+.idea/
+*.iml
+.vscode/
+docs/modules/ROOT/pages/includes/quarkus-seo*.adoc
