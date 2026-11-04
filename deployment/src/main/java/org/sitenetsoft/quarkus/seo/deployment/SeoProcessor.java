@@ -26,6 +26,8 @@ import io.quarkus.vertx.http.deployment.RouteBuildItem;
 import io.quarkus.vertx.http.deployment.spi.StaticResourcesBuildItem;
 import io.quarkus.vertx.http.runtime.HandlerType;
 import io.smallrye.config.ConfigValue;
+import io.vertx.core.Handler;
+import io.vertx.ext.web.RoutingContext;
 import io.smallrye.config.SmallRyeConfig;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
@@ -57,6 +59,9 @@ class SeoProcessor {
     static final String FEATURE = "seo";
     private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
     private static final String ROBOTS_PATH = "/robots.txt";
+    static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
+    static final String LLMS_TXT_PATH = "/llms.txt";
+    private static final Pattern INDEXNOW_KEY = Pattern.compile("[a-zA-Z0-9-]{8,128}");
     private static final String REST_PATH = "quarkus.rest.path";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
@@ -84,29 +89,57 @@ class SeoProcessor {
      * @param index the combined index
      * @param statics the static resources, absent when the application has none
      * @return the outputs
-     * @throws IllegalStateException when a sitemap path holds a colon, an asterisk or whitespace
+     * @throws IllegalStateException when a sitemap or manifest path holds a colon, an asterisk or whitespace, or when
+     *         IndexNow is on and its key is missing or invalid
      */
     @BuildStep
     SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
             Optional<StaticResourcesBuildItem> statics) {
         if (!config.enabled()) {
-            return new SeoOutputsBuildItem(false, false, false, Set.of());
+            return new SeoOutputsBuildItem(false, false, false, false, false, false, false, null, Set.of());
         }
         if (config.sitemap().enabled()) {
             checkPath("quarkus.seo.sitemap.path", config.sitemap().path());
             checkPath("quarkus.seo.sitemap.page-path", config.sitemap().pagePath());
         }
+        if (config.manifest().enabled()) {
+            checkPath("quarkus.seo.manifest.path", config.manifest().path());
+        }
+        String indexNowKeyPath = null;
+        if (config.indexNow().enabled()) {
+            checkIndexNowKey(config.indexNow().key().orElse(null));
+            indexNowKeyPath = "/" + config.indexNow().key().get() + ".txt";
+        }
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
+        String manifestPath = SeoPaths.normalize(config.manifest().path());
         Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index));
         Set<String> owned = new LinkedHashSet<>();
-        for (String path : List.of(sitemapPath, ROBOTS_PATH)) {
+        List<String> candidates = new ArrayList<>(List.of(sitemapPath, ROBOTS_PATH));
+        if (config.securityTxt().enabled()) {
+            candidates.add(SECURITY_TXT_PATH);
+        }
+        if (config.manifest().enabled()) {
+            candidates.add(manifestPath);
+        }
+        if (indexNowKeyPath != null) {
+            candidates.add(indexNowKeyPath);
+        }
+        if (config.llmsTxt().enabled()) {
+            candidates.add(LLMS_TXT_PATH);
+        }
+        for (String path : candidates) {
             if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
                 owned.add(path);
             }
         }
         boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
         boolean robots = config.robots().enabled() && !owned.contains(ROBOTS_PATH);
-        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, owned);
+        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SECURITY_TXT_PATH);
+        boolean manifest = config.manifest().enabled() && !owned.contains(manifestPath);
+        boolean indexNow = config.indexNow().enabled() && !owned.contains(indexNowKeyPath);
+        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(LLMS_TXT_PATH);
+        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, securityTxt, manifest, indexNow,
+                llmsTxt, indexNowKeyPath, owned);
     }
 
     /**
@@ -353,19 +386,47 @@ class SeoProcessor {
         if (!outputs.robots()) {
             return;
         }
-        if (config.robots().serveUnderRootPath()) {
-            routes.produce(RouteBuildItem.builder()
-                    .routeFunction(recorder.getRoute(ROBOTS_PATH))
-                    .handler(recorder.robotsHandler())
+        routes.produce(hostRootRoute(ROBOTS_PATH, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Build a route that sits on the host root unless the output is served under the root path.
+     *
+     * @param path the output path
+     * @param handler the handler of the route
+     * @param underRootPath true when the route sits under the HTTP root path
+     * @param recorder the recorder
+     * @param nonApplicationRootPath the non-application root path build item
+     * @return the route build item
+     */
+    private RouteBuildItem hostRootRoute(String path, Handler<RoutingContext> handler, boolean underRootPath,
+            SeoRecorder recorder, NonApplicationRootPathBuildItem nonApplicationRootPath) {
+        if (underRootPath) {
+            return RouteBuildItem.builder()
+                    .routeFunction(recorder.getRoute(path))
+                    .handler(handler)
                     .handlerType(HandlerType.BLOCKING)
-                    .build());
-            return;
+                    .build();
         }
-        routes.produce(nonApplicationRootPath.routeBuilder()
-                .routeFunction(ROBOTS_PATH, recorder.getAndHead())
-                .handler(recorder.robotsHandler())
+        return nonApplicationRootPath.routeBuilder()
+                .routeFunction(path, recorder.getAndHead())
+                .handler(handler)
                 .handlerType(HandlerType.BLOCKING)
-                .build());
+                .build();
+    }
+
+    /**
+     * Check the IndexNow key.
+     *
+     * @param key the configured key, or null when absent
+     * @throws IllegalStateException when the key is missing or does not hold 8 to 128 letters, digits or dashes
+     */
+    static void checkIndexNowKey(String key) {
+        if (key == null || !INDEXNOW_KEY.matcher(key).matches()) {
+            throw new IllegalStateException(
+                    "quarkus.seo.indexnow.key must hold 8 to 128 letters, digits or dashes when IndexNow is on");
+        }
     }
 
     /**
