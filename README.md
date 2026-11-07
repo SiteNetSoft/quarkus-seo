@@ -18,7 +18,7 @@ bean or a switch. Status: pre-release. No artifact is on Maven Central yet.
 - A Dev UI with an overview and a page check that lists content warnings in dev mode
 - No indexing outside the prod profile
 - Optional caching with `quarkus-cache`
-- Replaceable beans for locales, rendering, the sitemap, robots.txt and the base URL
+- Replaceable beans for locales, rendering, the sitemap, robots.txt, the base URL and IndexNow
 - Native image support that needs no configuration
 
 ## Getting Started

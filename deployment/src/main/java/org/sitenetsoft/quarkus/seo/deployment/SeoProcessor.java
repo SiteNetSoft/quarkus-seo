@@ -83,10 +83,12 @@ class SeoProcessor {
      * Decide which outputs the extension registers.
      *
      * <p>
-     * An output is off when the master switch or its feature switch is off. The sitemap and robots.txt are also off
-     * when the application serves their path itself, as a static file, a JAX-RS resource or a Reactive Route. A
-     * JAX-RS path includes the {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every
-     * match on {@code /robots.txt} as owned, whatever the root path. The step logs nothing about owned paths.
+     * An output is off when the master switch or its feature switch is off. An output is also off when the
+     * application serves its path itself, as a static file, a JAX-RS resource or a Reactive Route. The step checks the
+     * sitemap, robots.txt, security.txt, the manifest, the IndexNow key file and llms.txt. A JAX-RS path includes the
+     * {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every match on a host-root path
+     * as owned, whatever the root path. The host-root paths are {@code /robots.txt}, {@code /.well-known/security.txt},
+     * the IndexNow key file and {@code /llms.txt}. The step logs nothing about owned paths.
      *
      * @param config the build-time configuration
      * @param index the combined index
@@ -373,6 +375,7 @@ class SeoProcessor {
         routes.produce(RouteBuildItem.builder()
                 .routeFunction(recorder.getRoute(SeoPaths.normalize(config.manifest().path())))
                 .handler(recorder.manifestHandler())
+                // The handler does no I/O, so it runs on the event loop.
                 .handlerType(HandlerType.NORMAL)
                 .build());
     }

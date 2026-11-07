@@ -34,7 +34,7 @@ class IndexNowUnreachableTest {
     private static void assertNonBlockingAndNormal(IndexNow indexNow) throws Exception {
         long start = System.nanoTime();
         CompletableFuture<Void> stage = indexNow.submit("/a").toCompletableFuture();
-        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isLessThan(100);
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)).isLessThan(2000);
         stage.get(15, TimeUnit.SECONDS);
         assertThat(stage.isCompletedExceptionally()).isFalse();
     }

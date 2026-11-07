@@ -474,7 +474,7 @@ All of these are off by default. Each one has a build-time `enabled` key.
   - When the feature is on and the key is missing or invalid, the build fails. The message names the key.
   - The key file is served at `/{key}.txt`.
   - The `IndexNow` bean has `submit(String... paths)` and `submit(Collection<String>)`. It posts
-    up to 10,000 URLs per call with the JDK `HttpClient`, off the calling thread.
+    up to 10,000 URLs per request with the JDK `HttpClient`, off the calling thread.
   - Failures are logged at debug level and never thrown to the caller.
   - When `indexable` is false, `submit` does nothing. It needs `quarkus.seo.site-url` too, because a
     background job has no request to take a host from. Without `site-url`, it does nothing and logs at DEBUG.
