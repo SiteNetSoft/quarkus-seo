@@ -23,6 +23,10 @@ database. The sitemap, the hreflang links and `og:locale` follow your bean.
 
 |`BaseUrlResolver`
 |Decide the public base URL of each request. Use this when you know the public address better than the request does.
+
+|`IndexNow`
+|Send the IndexNow submissions in your own way. The bean exists when IndexNow is enabled. See
+xref:opt-in.adoc#indexnow[IndexNow].
 |===
 
 [source,java]
@@ -94,4 +98,7 @@ Each feature has a build-time switch. A switched-off feature leaves no route, be
 
 |`quarkus.seo.robots.enabled`
 |The `/robots.txt` file.
+
+|`quarkus.seo.security-txt.enabled`, `quarkus.seo.manifest.enabled`, `quarkus.seo.indexnow.enabled` and `quarkus.seo.llms-txt.enabled`
+|The opt-in outputs. They are off by default. See xref:opt-in.adoc[Opt-in outputs].
 |===

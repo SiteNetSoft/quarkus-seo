@@ -81,6 +81,8 @@ xref:robots.adoc#when-your-application-serves-robotstxt[When your application se
 * xref:json-ld.adoc[JSON-LD]: the schema.org builders.
 * xref:sitemap.adoc[Sitemap]: the three sources, splitting and caching.
 * xref:robots.adoc[robots.txt]: rule groups and the AI crawler presets.
+* xref:opt-in.adoc[Opt-in outputs]: security.txt, a web manifest, IndexNow and llms.txt. All are off by default.
+* xref:dev-ui.adoc[Dev UI]: the dev mode overview, the page check and the content warnings.
 * xref:customizing.adoc[Customizing]: replace any part with your own bean.
 * xref:integrating.adoc[Integrating from another extension]: use the extension through a capability.
 * xref:native.adoc[Native], xref:testing.adoc[Testing] and xref:releasing.adoc[Releasing].

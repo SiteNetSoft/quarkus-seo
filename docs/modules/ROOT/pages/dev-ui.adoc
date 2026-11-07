@@ -1,0 +1,105 @@
+= Dev UI
+include::./includes/attributes.adoc[]
+
+In dev mode, the extension adds a card named SEO to the Quarkus Dev UI. The card has two pages. The Dev UI and the
+checks run in dev mode only. The `prod` and `test` profiles stay quiet.
+
+== Overview
+
+The overview page shows:
+
+* the site URL, the site name, the locales and the default locale
+* whether the site is indexable
+* one row for each output, with its path and who serves it
+* the security.txt warnings
+
+The column "served by" has three values. `extension` means that the extension serves the output. `application` means
+that your application serves the path, so the extension serves none. `off` means that the output is switched off.
+
+== Page check
+
+Type a path in the field and select Check. The path is relative to the HTTP root path and starts with one slash.
+The page shows:
+
+* the HTTP status of the page
+* the head tags as the extension renders them
+* a search result snippet
+* a social card preview
+* the content warnings
+
+Select Check sitemap to check every page of the sitemap sources in one run. The result holds the number of checked
+pages, the number of skipped pages and the warnings of each page.
+
+=== What the check fetches
+
+The check sends a `GET` request to `http://localhost:{quarkus.http.port}` plus the root path plus your path. It reads
+the head that the extension recorded for that request. It does not parse HTML.
+
+* The field accepts a plain local path only. A value such as `https://example.org/`, `//example.org/x` or `x` shows
+an error. The check never fetches another host.
+* The check never follows redirects. A redirect shows as its status code.
+* For hreflang, the check fetches up to 20 alternate pages.
+* For the sitemap, the check fetches up to 200 pages. The other pages count as skipped. Pages on another host count
+as skipped too.
+* A page is on the same site when its URL starts with `site-url`. If `site-url` is unset, the check uses localhost.
+
+== Warning codes
+
+[cols="2,3"]
+|===
+|Code |Meaning
+
+|`missing-title`
+|The page has no title.
+
+|`long-title`
+|The title has more than 60 characters.
+
+|`missing-description`
+|The page has no description.
+
+|`description-length`
+|The description has fewer than 50 or more than 160 characters.
+
+|`missing-image`
+|The page has no image.
+
+|`relative-image`
+|The image URL is not absolute.
+
+|`one-way-hreflang`
+|An alternate page does not link back. The check compares the links as exact strings.
+
+|`duplicate-title`
+|More than one sitemap page uses the same title. The warning names every URL.
+
+|`no-seo-head`
+|The page rendered no `{#seo}` tag, so there is no head to check.
+
+|`fetch-failed`
+|The request for a sitemap page failed.
+
+|`security-txt-expires-missing`
+|The security.txt file has no expiry date.
+
+|`security-txt-expires-invalid`
+|The expiry value is not an ISO 8601 date or date-time.
+
+|`security-txt-expires-soon`
+|The expiry is less than 30 days ahead.
+
+|`security-txt-expired`
+|The expiry is in the past or equal to now.
+|===
+
+== Log lines in dev mode
+
+The first time a page renders, the extension logs each content warning at WARN. It logs once for each path. The
+format is:
+
+[source,text]
+----
+SEO check on /about: The page has no description. [missing-description]
+----
+
+At start, the extension logs the security.txt warnings the same way. The log lines appear in dev mode only.

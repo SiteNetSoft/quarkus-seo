@@ -1,6 +1,6 @@
 # Quarkus SEO Design
 
-**Status:** draft design, pre-implementation
+**Status:** implemented (plans 1 and 2)
 **Date:** 2026-10-29
 **Deliverable:** a Quarkus extension, `org.sitenetsoft:quarkus-seo`, built with Maven. It gives an
 application meta tags, JSON-LD, a sitemap and robots.txt with almost no setup. It also offers
@@ -107,7 +107,8 @@ is the main way to use the extension. `quarkus-cache` is optional and is used on
 application has it.
 
 The runtime descriptor (`META-INF/quarkus-extension.yaml`) declares:
-- the capability `org.sitenetsoft.seo`
+- the capability `org.sitenetsoft.seo`, which the extension provides only when `quarkus.seo.enabled` and
+  `quarkus.seo.meta.enabled` are both true
 - `config: ["quarkus.seo."]`
 - `categories: ["web"]`
 - `status: "preview"`
@@ -245,6 +246,9 @@ the designer's call.
 A higher layer replaces only the fields it sets. Setting a title does not clear the image.
 Lists such as alternates and JSON-LD nodes add to the lower layer. They do not replace it.
 
+Some fields merge as a group. The title and the absolute title are one group. The image, its size and its alt text
+are another. A layer that sets any field of a group replaces the whole group of the lower layers.
+
 ### 5.3 Computed values
 
 - **Title:** the template is applied to the page title. With no page title, `title.default` is
@@ -375,9 +379,11 @@ Caching is opt-in.
 - `SeoCaches.invalidateSitemap()` clears it, for example after a CMS publish.
 - If caching is enabled without `quarkus-cache`, the extension logs one info message at startup
   and serves without a cache.
+- The output cache is used only when `site-url` or `allowed-hosts` pins the host. Without a pinned host, the output
+  depends on the request host, so the extension serves without a cache.
 
-The robots.txt and llms.txt outputs use the same pattern with the caches `seo-robots` and
-`seo-llms`.
+The robots.txt output uses the same pattern with the cache `seo-robots`. The llms.txt output has no output
+cache. Its ETag and Cache-Control header still apply.
 
 ### 7.4 Switches
 
@@ -446,24 +452,40 @@ All of these are off by default. Each one has a build-time `enabled` key.
   - Keys: `contact` (list), `expires`, `encryption`, `policy`, `preferred-languages`, `hiring`.
     `Canonical` is added automatically.
   - When `expires` is in the past or less than 30 days away, the Dev UI and dev mode show a
-    warning. Prod stays quiet.
+    warning. A date equal to now counts as expired. Prod stays quiet.
+  - `expires` accepts an ISO offset date-time or a plain date, which means the start of that day in UTC. A
+    date-time with no offset is dropped. A missing or unparseable value leaves the line out, and the response is
+    still 200. The Dev UI and the dev log warn.
+  - A contact that holds `@` and no scheme gets `mailto:`. With no contact, the path answers 404.
+  - The file is served at the host root, like robots.txt. `serve-under-root-path` (build time, default `false`)
+    moves it under the root path. The IndexNow key file and llms.txt follow the same rule (§8.1).
 - **Web manifest** (`quarkus.seo.manifest.*`):
   - Served at `quarkus.seo.manifest.path`, default `/manifest.webmanifest`, with
     `application/manifest+json`.
   - Keys: `name` (falls back to the site name), `short-name`, `start-url`, `display`,
     `theme-color`, `background-color` and `icons` (src, sizes, type).
-  - `{#seo}` adds the `<link rel="manifest">` tag.
+  - `start-url` defaults to the root path plus `/`. A `start-url` or icon `src` that starts with `/` gets the root
+    path in front. The manifest sits under the root path, like the sitemap.
+  - `{#seo}` adds the `<link rel="manifest">` tag only when the extension serves the manifest. An application
+    that ships its own manifest writes its own link.
 - **IndexNow** (`quarkus.seo.indexnow.*`):
   - Keys: `key` (8 to 128 characters of `[a-zA-Z0-9-]`) and `endpoint` (default
     `https://api.indexnow.org/indexnow`).
+  - When the feature is on and the key is missing or invalid, the build fails. The message names the key.
   - The key file is served at `/{key}.txt`.
   - The `IndexNow` bean has `submit(String... paths)` and `submit(Collection<String>)`. It posts
     up to 10,000 URLs per call with the JDK `HttpClient`, off the calling thread.
   - Failures are logged at debug level and never thrown to the caller.
-  - When `indexable` is false, `submit` does nothing.
+  - When `indexable` is false, `submit` does nothing. It needs `quarkus.seo.site-url` too, because a
+    background job has no request to take a host from. Without `site-url`, it does nothing and logs at DEBUG.
+    A URL on another host is dropped. The returned stage always completes normally.
+  - When the feature is on, the `IndexNow` bean exists even if the application serves its own key file.
+    Ownership skips only the key-file route.
 - **llms.txt** (`quarkus.seo.llms-txt.*`):
   - Served at `/llms.txt`, generated from the sitemap sources: the site name as the heading, the
-    site description as a quote, then one link per URL that has a title.
+    site description as a quote, then one link per URL that has a title. With no site name, the heading is the
+    base URL.
+  - The file is served when the site is not indexable, like the sitemap. It has no output cache.
   - The docs say plainly that no search engine is known to use this file.
 
 ## 10. Conflicts and switching off
@@ -473,11 +495,12 @@ All of these are off by default. Each one has a build-time `enabled` key.
   no route, bean or filter.
 - **Application files win.** At build time the extension checks for its paths among:
   - static resources (`META-INF/resources/robots.txt` and the others)
-  - JAX-RS resource paths
+  - JAX-RS resource paths, with the `@ApplicationPath` or `quarkus.rest.path` prefix
   - Reactive Routes paths
 
   If the application has any of them, the extension does not register its own route for that
   path. It logs nothing in prod, and the Dev UI shows which outputs the application owns.
+- **Sitemap entry paths:** the same JAX-RS prefix applies to the paths of `@SitemapEntry` methods.
 - **Routes:** the extension registers plain Vert.x routes through `RouteBuildItem`, not JAX-RS
   resources. JAX-RS needs a constant `@Path`, which is why quarkus-tus cannot move its endpoints.
   Vert.x routes let the sitemap and manifest paths come from config.
@@ -528,7 +551,7 @@ spec states the same split.
 
 The designer put the Dev UI in version 1. The user can move it to a later version. It is
 only active in dev mode and has:
-- **Config:** the resolved values (site URL, site name, locales, indexable, enabled features),
+- **Overview:** the resolved values (site URL, site name, locales, indexable, enabled features),
   and which outputs the application owns (§10).
 - **Preview:** links to the sitemap, robots.txt and the other outputs.
 - **Page check:** an input that takes a path. It renders the resolved head tags, shows a
@@ -538,6 +561,14 @@ only active in dev mode and has:
   - relative or missing `og:image`
   - one-way hreflang
   - duplicate titles across sitemap URLs
+
+The page check fetches only `http://localhost:{quarkus.http.port}` plus the root path. It refuses any input that
+is not a plain local path and never follows redirects. It checks up to 20 hreflang targets and up to 200 sitemap
+URLs, and counts the rest as skipped. Same-site matching uses `site-url`, or localhost when `site-url` is unset.
+One-way hreflang compares hrefs as exact strings. A page that renders no `{#seo}` tag shows "no SEO head found",
+because the check reads the head that `SeoDevCapture` recorded and does not parse HTML.
+
+The overview warns when the security.txt expiry is missing, invalid, in the past or less than 30 days ahead.
 
 The same warnings are logged in dev mode, once per path. They are never logged in prod.
 

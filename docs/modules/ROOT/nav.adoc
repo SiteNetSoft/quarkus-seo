@@ -3,6 +3,8 @@
 * xref:json-ld.adoc[JSON-LD]
 * xref:sitemap.adoc[Sitemap]
 * xref:robots.adoc[robots.txt]
+* xref:opt-in.adoc[Opt-in outputs]
+* xref:dev-ui.adoc[Dev UI]
 * xref:customizing.adoc[Customizing]
 * xref:integrating.adoc[Integrating from another extension]
 * xref:native.adoc[Native]
