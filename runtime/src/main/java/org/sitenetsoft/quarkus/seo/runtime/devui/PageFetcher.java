@@ -2,6 +2,7 @@ package org.sitenetsoft.quarkus.seo.runtime.devui;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -43,6 +44,7 @@ final class PageFetcher {
      *
      * <p>
      * A local path starts with exactly one slash. It holds no backslash, no control character and no whitespace.
+     * It is also a valid URI reference, so a lone {@code %} or a character such as {@code |} is refused.
      *
      * @param input the value from the Dev UI
      * @return the path, or empty when the value is not a local path
@@ -59,6 +61,14 @@ final class PageFetcher {
             if (c == '\\' || Character.isISOControl(c) || Character.isWhitespace(c) || Character.isSpaceChar(c)) {
                 return Optional.empty();
             }
+        }
+        try {
+            URI uri = new URI("http://localhost" + input);
+            if (!"localhost".equals(uri.getRawAuthority())) {
+                return Optional.empty();
+            }
+        } catch (URISyntaxException e) {
+            return Optional.empty();
         }
         return Optional.of(input);
     }
@@ -88,12 +98,17 @@ final class PageFetcher {
      * @param path the path relative to the HTTP root path
      * @return the HTTP status
      * @throws IllegalArgumentException when the path is not a local path
-     * @throws IOException when the request fails
+     * @throws IOException when the URL is not valid or the request fails
      * @throws InterruptedException when the thread is interrupted during the request
      */
     int fetch(String path) throws IOException, InterruptedException {
         String local = localPath(path).orElseThrow(() -> new IllegalArgumentException("Not a local path: " + path));
-        URI uri = URI.create("http://localhost:" + port() + rootPath + local);
+        URI uri;
+        try {
+            uri = new URI("http://localhost:" + port() + rootPath + local);
+        } catch (URISyntaxException e) {
+            throw new IOException("The URL of " + local + " is not valid: " + e.getMessage(), e);
+        }
         HttpRequest request = HttpRequest.newBuilder(uri).timeout(TIMEOUT).GET().build();
         return client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
     }

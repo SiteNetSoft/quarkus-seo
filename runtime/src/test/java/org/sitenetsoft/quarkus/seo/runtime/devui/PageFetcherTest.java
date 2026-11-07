@@ -33,6 +33,17 @@ class PageFetcherTest {
     }
 
     @Test
+    void refusesValuesThatAreNotValidUris() {
+        assertThat(localPath("/100%")).isEmpty();
+        assertThat(localPath("/a|b")).isEmpty();
+        assertThat(localPath("/a<b")).isEmpty();
+        assertThat(localPath("/q?x={y}")).isEmpty();
+        assertThat(localPath("/a^b")).isEmpty();
+        assertThat(localPath("/a\"b")).isEmpty();
+        assertThat(localPath("/100%25")).contains("/100%25");
+    }
+
+    @Test
     void capturePathDropsQueryAndFragment() {
         assertThat(PageFetcher.capturePath("/a/b?x=1#top")).isEqualTo("/a/b");
         assertThat(PageFetcher.capturePath("/a#top")).isEqualTo("/a");

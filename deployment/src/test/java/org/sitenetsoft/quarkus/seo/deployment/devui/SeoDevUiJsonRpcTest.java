@@ -55,7 +55,7 @@ class SeoDevUiJsonRpcTest extends DevUIJsonRPCTest {
 
     @Test
     void checkPageRefusesOtherHosts() throws Exception {
-        for (String path : List.of("https://evil.example/", "//evil.example/x", "x")) {
+        for (String path : List.of("https://evil.example/", "//evil.example/x", "x", "/100%")) {
             JsonNode result = executeJsonRPCMethod("checkPage", Map.of("path", path));
 
             assertThat(result.has("error")).as(path).isTrue();
