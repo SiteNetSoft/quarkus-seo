@@ -16,6 +16,7 @@ final class ManifestWriter {
 
     /**
      * Write the manifest in a fixed key order and leave out the keys that have no value.
+     * The method also leaves out an icon that has no URL.
      *
      * @param config the manifest configuration
      * @param siteName the site name, used when the configuration sets no name
@@ -29,22 +30,23 @@ final class ManifestWriter {
         boolean[] first = { true };
         member(out, first, "name", config.name().or(() -> siteName).orElse(null));
         member(out, first, "short_name", config.shortName().orElse(null));
-        member(out, first, "start_url", config.startUrl().map(url -> url(rootPath, url)).orElse(rootPath + "/"));
+        member(out, first, "start_url", config.startUrl().filter(url -> !url.isBlank()).map(url -> url(rootPath, url))
+                .orElse(rootPath + "/"));
         member(out, first, "display", config.display().map(ManifestWriter::display).orElse(null));
         member(out, first, "theme_color", config.themeColor().or(() -> themeColor).orElse(null));
         member(out, first, "background_color", config.backgroundColor().orElse(null));
-        if (!config.icons().isEmpty()) {
-            separator(out, first);
-            out.append("\"icons\":[");
-            boolean firstIcon = true;
-            for (SeoConfig.Icon icon : new TreeMap<>(config.icons()).values()) {
-                if (!firstIcon) {
-                    out.append(',');
+        StringBuilder icons = new StringBuilder();
+        for (SeoConfig.Icon icon : new TreeMap<>(config.icons()).values()) {
+            if (icon.src().isPresent() && !icon.src().get().isBlank()) {
+                if (icons.length() > 0) {
+                    icons.append(',');
                 }
-                firstIcon = false;
-                icon(out, icon, rootPath);
+                icon(icons, icon, rootPath);
             }
-            out.append(']');
+        }
+        if (icons.length() > 0) {
+            separator(out, first);
+            out.append("\"icons\":[").append(icons).append(']');
         }
         return out.append('}').toString();
     }
@@ -52,7 +54,7 @@ final class ManifestWriter {
     private static void icon(StringBuilder out, SeoConfig.Icon icon, String rootPath) {
         out.append('{');
         boolean[] first = { true };
-        member(out, first, "src", url(rootPath, icon.src()));
+        member(out, first, "src", url(rootPath, icon.src().get()));
         member(out, first, "sizes", icon.sizes().orElse(null));
         member(out, first, "type", icon.type().orElse(null));
         out.append('}');

@@ -537,8 +537,8 @@ public interface SeoConfig {
         Optional<String> shortName();
 
         /**
-         * Set the start URL. A value that starts with a slash gets the HTTP root path in front. When unset, the
-         * start URL is the root path.
+         * Set the start URL. A value that starts with a slash gets the HTTP root path in front. When unset or
+         * blank, the start URL is the root path.
          *
          * @return the start URL
          */
@@ -579,11 +579,12 @@ public interface SeoConfig {
     interface Icon {
 
         /**
-         * Set the icon URL. A value that starts with a slash gets the HTTP root path in front.
+         * Set the icon URL. A value that starts with a slash gets the HTTP root path in front. The manifest leaves out
+         * an icon that has no URL.
          *
          * @return the URL
          */
-        String src();
+        Optional<String> src();
 
         /**
          * Set the icon sizes, for example {@code 192x192}.

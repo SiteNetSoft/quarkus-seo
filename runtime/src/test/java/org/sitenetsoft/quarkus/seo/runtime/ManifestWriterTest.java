@@ -17,8 +17,8 @@ class ManifestWriterTest {
     private static SeoConfig.Icon icon(String src, String sizes, String type) {
         return new SeoConfig.Icon() {
             @Override
-            public String src() {
-                return src;
+            public Optional<String> src() {
+                return Optional.ofNullable(src);
             }
 
             @Override
@@ -92,5 +92,32 @@ class ManifestWriterTest {
     void emptyKeysAreLeftOut() {
         String json = ManifestWriter.write(cfg(new TestConfig()), Optional.empty(), Optional.empty(), "");
         assertThat(json).isEqualTo("{\"start_url\":\"/\"}");
+    }
+
+    @Test
+    void iconWithoutSrcIsSkipped() {
+        Map<String, SeoConfig.Icon> icons = new LinkedHashMap<>();
+        icons.put("a", icon(null, "192x192", null));
+        icons.put("b", icon("/b.png", null, null));
+        icons.put("c", icon("  ", "64x64", null));
+        assertThat(ManifestWriter.write(cfg(new TestConfig().with("manifest.icons", icons)), Optional.empty(),
+                Optional.empty(), ""))
+                .contains("\"icons\":[{\"src\":\"/b.png\"}]")
+                .doesNotContain("192x192")
+                .doesNotContain("64x64");
+    }
+
+    @Test
+    void iconsKeyIsLeftOutWhenNoIconHasSrc() {
+        TestConfig test = new TestConfig().with("manifest.icons", Map.of("a", icon(null, "192x192", null)));
+        assertThat(ManifestWriter.write(cfg(test), Optional.empty(), Optional.empty(), ""))
+                .doesNotContain("icons");
+    }
+
+    @Test
+    void blankStartUrlCountsAsUnset() {
+        TestConfig test = new TestConfig().with("manifest.startUrl", "  ");
+        assertThat(ManifestWriter.write(cfg(test), Optional.empty(), Optional.empty(), "/app"))
+                .contains("\"start_url\":\"/app/\"");
     }
 }
