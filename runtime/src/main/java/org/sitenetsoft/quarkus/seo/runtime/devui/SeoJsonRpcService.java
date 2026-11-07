@@ -21,7 +21,6 @@ import org.sitenetsoft.quarkus.seo.ResolvedSeo;
 import org.sitenetsoft.quarkus.seo.SeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.SeoLocales;
 import org.sitenetsoft.quarkus.seo.SitemapUrl;
-import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoChecks;
 import org.sitenetsoft.quarkus.seo.runtime.SeoConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSettings;
@@ -46,7 +45,7 @@ public class SeoJsonRpcService {
     private static final String WARNINGS = "warnings";
 
     private final SeoConfig config;
-    private final SeoBuildConfig buildConfig;
+    private final SecurityTxtServed securityTxtServed;
     private final SeoSettings settings;
     private final SeoLocales locales;
     private final Instance<SeoDevCapture> capture;
@@ -58,7 +57,7 @@ public class SeoJsonRpcService {
      * Create the service.
      *
      * @param config the run-time SEO configuration
-     * @param buildConfig the build-time SEO configuration
+     * @param securityTxtServed whether the extension serves security.txt, as the build found it
      * @param settings the resolved site settings
      * @param locales the site locales
      * @param capture the dev capture, which exists when the meta tag feature is on
@@ -66,10 +65,11 @@ public class SeoJsonRpcService {
      * @param sitemap the sitemap service, which exists when the extension serves the sitemap or llms.txt
      */
     @Inject
-    public SeoJsonRpcService(SeoConfig config, SeoBuildConfig buildConfig, SeoSettings settings, SeoLocales locales,
-            Instance<SeoDevCapture> capture, Instance<SeoHeadRenderer> renderer, Instance<SitemapService> sitemap) {
+    public SeoJsonRpcService(SeoConfig config, SecurityTxtServed securityTxtServed, SeoSettings settings,
+            SeoLocales locales, Instance<SeoDevCapture> capture, Instance<SeoHeadRenderer> renderer,
+            Instance<SitemapService> sitemap) {
         this.config = config;
-        this.buildConfig = buildConfig;
+        this.securityTxtServed = securityTxtServed;
         this.settings = settings;
         this.locales = locales;
         this.capture = capture;
@@ -95,10 +95,8 @@ public class SeoJsonRpcService {
         result.put("locales", tags);
         result.put("defaultLocale", locales.defaultLocale().toLanguageTag());
         result.put("indexable", settings.indexable());
-        List<SeoWarning> securityTxt = List.of();
-        if (buildConfig.enabled() && buildConfig.securityTxt().enabled()) {
-            securityTxt = SeoChecks.securityTxt(config.securityTxt(), Instant.now());
-        }
+        List<SeoWarning> securityTxt = SeoChecks.servedSecurityTxt(config.securityTxt(), securityTxtServed.served(),
+                Instant.now());
         result.put("securityTxtWarnings", warnings(securityTxt));
         return result;
     }
@@ -227,7 +225,7 @@ public class SeoJsonRpcService {
     private Fetched fetch(String path) throws IOException, InterruptedException {
         String key = PageFetcher.capturePath(path);
         SeoDevCapture devCapture = capture.get();
-        devCapture.clear(key);
+        devCapture.expect(key);
         int status = fetcher.fetch(path);
         return new Fetched(status, devCapture.last(key));
     }

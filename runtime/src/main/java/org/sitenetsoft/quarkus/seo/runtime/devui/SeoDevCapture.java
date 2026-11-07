@@ -35,6 +35,13 @@ public class SeoDevCapture {
         }
     };
 
+    private final Map<String, Boolean> logged = new LinkedHashMap<>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+            return size() > MAX_PATHS;
+        }
+    };
+
     /**
      * Store the result of a path and log its warnings the first time the path appears.
      *
@@ -44,7 +51,8 @@ public class SeoDevCapture {
     public void record(String path, ResolvedSeo seo) {
         boolean first;
         synchronized (captured) {
-            first = captured.put(path, seo) == null;
+            captured.put(path, seo);
+            first = logged.put(path, Boolean.TRUE) == null;
         }
         if (first) {
             List<SeoWarning> warnings = SeoChecks.page(seo);
@@ -67,13 +75,18 @@ public class SeoDevCapture {
     }
 
     /**
-     * Forget a path, so that its warnings log again on the next request.
+     * Forget the stored result of a path and mark the path as logged.
+     *
+     * <p>
+     * The Dev UI calls this method before it fetches a page. The next result of the path is stored and read, but its
+     * warnings do not log, because the Dev UI shows them.
      *
      * @param path the request path, relative to the HTTP root path
      */
-    public void clear(String path) {
+    public void expect(String path) {
         synchronized (captured) {
             captured.remove(path);
+            logged.put(path, Boolean.TRUE);
         }
     }
 }

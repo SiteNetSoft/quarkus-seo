@@ -5,9 +5,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.inject.Singleton;
+
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
+import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.deployment.IsLocalDevelopment;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
@@ -21,6 +24,7 @@ import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
 import org.sitenetsoft.quarkus.seo.runtime.SeoPaths;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSettings;
+import org.sitenetsoft.quarkus.seo.runtime.devui.SecurityTxtServed;
 import org.sitenetsoft.quarkus.seo.runtime.devui.SeoDevCapture;
 import org.sitenetsoft.quarkus.seo.runtime.devui.SeoJsonRpcService;
 
@@ -64,6 +68,27 @@ public class SeoDevUiProcessor {
             return;
         }
         recorder.logSecurityTxtWarnings();
+    }
+
+    /**
+     * Record whether the extension serves security.txt as a bean for the Dev UI service.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @return the synthetic bean, or null when the extension is switched off
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    SyntheticBeanBuildItem securityTxtServed(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!config.enabled()) {
+            return null;
+        }
+        return SyntheticBeanBuildItem.configure(SecurityTxtServed.class)
+                .scope(Singleton.class)
+                .unremovable()
+                .supplier(recorder.securityTxtServed(outputs.securityTxt()))
+                .done();
     }
 
     /**

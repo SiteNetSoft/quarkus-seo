@@ -11,7 +11,7 @@ The overview page shows:
 * the site URL, the site name, the locales and the default locale
 * whether the site is indexable
 * one row for each output, with its path and who serves it
-* the security.txt warnings
+* the security.txt warnings, when the extension serves a security.txt file that has a contact
 
 The column "served by" has three values. `extension` means that the extension serves the output. `application` means
 that your application serves the path, so the extension serves none. `off` means that the output is switched off.
@@ -102,4 +102,8 @@ format is:
 SEO check on /about: The page has no description. [missing-description]
 ----
 
-At start, the extension logs the security.txt warnings the same way. The log lines appear in dev mode only.
+At start, the extension logs the security.txt warnings the same way. It does so only when it serves a security.txt
+file that has at least one contact. The log lines appear in dev mode only.
+
+The page check and the sitemap check do not log. They show their warnings in the Dev UI. A path that the Dev UI
+fetched does not log its warnings when you open it in the browser later.

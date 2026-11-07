@@ -115,4 +115,18 @@ class SeoChecksTest {
         assertThat(expiry(null)).containsExactly("security-txt-expires-missing");
         assertThat(expiry("soon")).containsExactly("security-txt-expires-invalid");
     }
+
+    @Test
+    void servedSecurityTxtNeedsServingAndContact() {
+        SeoConfig.SecurityTxt withContact = new TestConfig()
+                .with("securityTxt.contact", List.of("mailto:sec@ex.com")).config().securityTxt();
+        SeoConfig.SecurityTxt blankContact = new TestConfig()
+                .with("securityTxt.contact", List.of("  ")).config().securityTxt();
+        SeoConfig.SecurityTxt noContact = new TestConfig().config().securityTxt();
+        assertThat(codes(SeoChecks.servedSecurityTxt(withContact, true, NOW)))
+                .containsExactly("security-txt-expires-missing");
+        assertThat(SeoChecks.servedSecurityTxt(withContact, false, NOW)).isEmpty();
+        assertThat(SeoChecks.servedSecurityTxt(blankContact, true, NOW)).isEmpty();
+        assertThat(SeoChecks.servedSecurityTxt(noContact, true, NOW)).isEmpty();
+    }
 }

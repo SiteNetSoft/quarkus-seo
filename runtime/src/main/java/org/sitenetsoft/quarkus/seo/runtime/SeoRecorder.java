@@ -18,6 +18,7 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import org.sitenetsoft.quarkus.seo.runtime.devui.SecurityTxtServed;
 
 /**
  * Record build-time findings for the run time.
@@ -199,12 +200,23 @@ public class SeoRecorder {
     }
 
     /**
+     * Create the supplier of the holder that tells whether the extension serves security.txt.
+     *
+     * @param served true when the extension serves security.txt
+     * @return the supplier of the holder
+     */
+    public Supplier<SecurityTxtServed> securityTxtServed(boolean served) {
+        SecurityTxtServed holder = new SecurityTxtServed(served);
+        return () -> holder;
+    }
+
+    /**
      * Log the security.txt content problems once at WARN.
      */
     public void logSecurityTxtWarnings() {
         SeoConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class).getConfigMapping(SeoConfig.class);
         Logger log = Logger.getLogger(SeoRecorder.class);
-        for (SeoWarning warning : SeoChecks.securityTxt(config.securityTxt(), Instant.now())) {
+        for (SeoWarning warning : SeoChecks.servedSecurityTxt(config.securityTxt(), true, Instant.now())) {
             log.warn("SEO check on security.txt: " + warning.message() + " [" + warning.code() + "]");
         }
     }

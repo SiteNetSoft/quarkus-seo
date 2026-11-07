@@ -119,6 +119,21 @@ public final class SeoChecks {
     }
 
     /**
+     * Check the expiry of the security.txt file when the extension serves a file with at least one contact.
+     *
+     * @param config the security.txt configuration
+     * @param served whether the extension serves the security.txt file
+     * @param now the current time
+     * @return the warnings about the expiry, empty when no file is served or the expiry is far enough away
+     */
+    public static List<SeoWarning> servedSecurityTxt(SeoConfig.SecurityTxt config, boolean served, Instant now) {
+        if (!served || SecurityTxtWriter.write(config, "").isEmpty()) {
+            return List.of();
+        }
+        return securityTxt(config, now);
+    }
+
+    /**
      * Check the expiry of the security.txt file.
      *
      * @param config the security.txt configuration
