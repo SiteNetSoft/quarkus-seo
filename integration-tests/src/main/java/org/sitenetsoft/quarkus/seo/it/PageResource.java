@@ -2,6 +2,9 @@ package org.sitenetsoft.quarkus.seo.it;
 
 import java.time.Instant;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -15,6 +18,7 @@ import io.quarkus.qute.Template;
 import io.quarkus.qute.TemplateInstance;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.Context;
+import org.sitenetsoft.quarkus.seo.IndexNow;
 import org.sitenetsoft.quarkus.seo.Seo;
 import org.sitenetsoft.quarkus.seo.SeoCaches;
 import org.sitenetsoft.quarkus.seo.SitemapEntry;
@@ -37,6 +41,9 @@ public class PageResource {
 
     @Inject
     BlogContributor contributor;
+
+    @Inject
+    IndexNow indexNow;
 
     /**
      * Declare the templates of this resource.
@@ -132,5 +139,21 @@ public class PageResource {
     @Produces("text/plain")
     public String contributorCalls() {
         return Integer.toString(contributor.calls());
+    }
+
+    /**
+     * Submit a blog URL to IndexNow and wait until the request ends.
+     *
+     * @return a confirmation
+     * @throws InterruptedException when the wait is interrupted
+     * @throws ExecutionException when the submission fails
+     * @throws TimeoutException when the submission takes longer than ten seconds
+     */
+    @POST
+    @Path("publish")
+    @Produces("text/plain")
+    public String publish() throws InterruptedException, ExecutionException, TimeoutException {
+        indexNow.submit("/blog/first").toCompletableFuture().get(10, TimeUnit.SECONDS);
+        return "ok";
     }
 }
