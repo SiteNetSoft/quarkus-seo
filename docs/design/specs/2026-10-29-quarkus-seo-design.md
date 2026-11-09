@@ -1,6 +1,6 @@
 # Quarkus SEO Design
 
-**Status:** implemented (plans 1 and 2)
+**Status:** implemented (plans 1 to 3)
 **Date:** 2026-10-29
 **Deliverable:** a Quarkus extension, `org.sitenetsoft:quarkus-seo`, built with Maven. It gives an
 application meta tags, JSON-LD, a sitemap and robots.txt with almost no setup. It also offers

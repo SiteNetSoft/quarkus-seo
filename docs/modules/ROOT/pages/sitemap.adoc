@@ -76,7 +76,8 @@ The default is `/sitemap-{n}.xml`. The token `{n}` is the page number.
 * The extension adds a leading slash to both paths, collapses repeated slashes and strips a trailing slash. If a path
 holds a colon, an asterisk or whitespace, the build fails.
 * Alternates become `xhtml:link` elements, with a link for the page itself and an `x-default` link. If no alternate
-points to the URL itself, the extension adds a link for the URL with the tag of the default locale.
+points to the URL itself, the extension adds a link for the URL with the tag of the default locale. It skips that
+extra link when an alternate already uses the default locale.
 * The extension writes images with the image namespace.
 * The content type is `application/xml; charset=utf-8`.
 * Every response has an ETag. A request with a matching `If-None-Match` header gets a 304 response.
