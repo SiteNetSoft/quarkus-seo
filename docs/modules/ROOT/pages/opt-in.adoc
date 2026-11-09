@@ -1,0 +1,196 @@
+= Opt-in outputs
+include::./includes/attributes.adoc[]
+
+The extension has four outputs that are off by default. They are security.txt, a web manifest, IndexNow and
+llms.txt. Each output has a build-time key `enabled`. A switched-off output registers no route and no bean.
+
+Every output that the extension serves is a text response. The response has an ETag and the `Cache-Control` header of
+the sitemap. The key `quarkus.seo.sitemap.cache-control` sets that header.
+
+[#host-root]
+== Host-root files and the root path
+
+Crawlers read security.txt, the IndexNow key file and llms.txt at the root of the host. These three outputs follow the
+same rule as robots.txt. When `quarkus.http.root-path` is another value than `/`, the extension still registers the
+routes at the host root.
+
+Each output has a build-time key `serve-under-root-path`. The default is `false`. Set the key to `true` to serve the
+file under the root path instead. Use this setting when a proxy maps the host root to the application.
+
+[cols="2,2"]
+|===
+|Output |Key
+
+|security.txt
+|`quarkus.seo.security-txt.serve-under-root-path`
+
+|IndexNow key file
+|`quarkus.seo.indexnow.serve-under-root-path`
+
+|llms.txt
+|`quarkus.seo.llms-txt.serve-under-root-path`
+|===
+
+The manifest is not a host-root file. It sits under the root path, like the sitemap.
+
+[#application-files]
+== When your application serves the file
+
+If your application serves one of these paths, the extension serves none for that path. The rules are the same as for
+xref:robots.adoc#when-your-application-serves-robotstxt[robots.txt]. The checked paths are `/.well-known/security.txt`,
+`/llms.txt`, the manifest path and `/{key}.txt` for IndexNow. A match on a host-root path counts as owned, whatever
+the root path.
+
+The `@SitemapEntry` paths and the ownership check include the JAX-RS prefix. An `@ApplicationPath` sets that prefix.
+Without one, `quarkus.rest.path` sets it.
+
+== security.txt
+
+The extension serves `/.well-known/security.txt`. The path is fixed.
+
+[source,properties]
+----
+quarkus.seo.security-txt.enabled=true
+quarkus.seo.security-txt.contact=security@example.org,https://example.org/report
+quarkus.seo.security-txt.expires=2027-06-30
+quarkus.seo.security-txt.policy=https://example.org/security-policy
+quarkus.seo.security-txt.preferred-languages=en,fr
+----
+
+With `site-url` set to `https://example.org`, the output is:
+
+[source,text]
+----
+Contact: mailto:security@example.org
+Contact: https://example.org/report
+Expires: 2027-06-30T00:00:00Z
+Policy: https://example.org/security-policy
+Preferred-Languages: en, fr
+Canonical: https://example.org/.well-known/security.txt
+----
+
+The extension writes the fields in the order of RFC 9116. It adds the `Canonical` field for you.
+
+* A contact that holds `@` and no scheme gets `mailto:`.
+* `expires` accepts an ISO 8601 date-time with an offset, such as `2027-06-30T12:00:00+02:00`. It accepts a plain
+date too. A plain date means the start of that day in UTC.
+* A date-time with no offset is not valid. The extension drops it.
+* If `expires` is missing or does not parse, the extension leaves the `Expires` line out. The response is still `200`.
+The Dev UI and the dev mode log show a warning. See xref:dev-ui.adoc[Dev UI].
+* If you set no contact, the path answers `404`.
+
+== Web manifest
+
+The extension serves the manifest at `quarkus.seo.manifest.path`. The default is `/manifest.webmanifest`. The content
+type is `application/manifest+json`.
+
+[source,properties]
+----
+quarkus.seo.manifest.enabled=true
+quarkus.seo.manifest.short-name=Example
+quarkus.seo.manifest.display=standalone
+quarkus.seo.manifest.theme-color=#0b5fff
+quarkus.seo.manifest.background-color=#ffffff
+quarkus.seo.manifest.icons.small.src=/icons/192.png
+quarkus.seo.manifest.icons.small.sizes=192x192
+quarkus.seo.manifest.icons.small.type=image/png
+----
+
+With `quarkus.seo.site-name=Example`, the output is:
+
+[source,json]
+----
+{"name":"Example","short_name":"Example","start_url":"/","display":"standalone","theme_color":"#0b5fff","background_color":"#ffffff","icons":[{"src":"/icons/192.png","sizes":"192x192","type":"image/png"}]}
+----
+
+* `name` falls back to the site name.
+* `theme-color` falls back to `quarkus.seo.theme-color`.
+* `start-url` defaults to the root path plus `/`.
+* A `start-url` or icon `src` that starts with `/` gets the root path in front. A value with a scheme stays as it is.
+* The manifest lists the icons in the alphabetical order of their names.
+* The `{#seo}` tag writes `<link rel="manifest">` only when the extension serves the manifest. If your application
+ships its own manifest, write the link in your own template.
+
+[#indexnow]
+== IndexNow
+
+IndexNow tells participating search engines that URLs changed. The extension serves the key file and offers an
+`IndexNow` bean.
+
+[source,properties]
+----
+quarkus.seo.site-url=https://example.org
+quarkus.seo.indexnow.enabled=true
+quarkus.seo.indexnow.key=0a1b2c3d4e5f6a7b
+----
+
+The key file is `/0a1b2c3d4e5f6a7b.txt`. It holds the key.
+
+* The key has 8 to 128 characters. Each one is a letter, a digit or a dash.
+* If the feature is on and the key is missing or invalid, the build fails. The message names
+`quarkus.seo.indexnow.key`. No fallback key can be right.
+* The key is a build-time value. The endpoint is a run-time value. `quarkus.seo.indexnow.endpoint` defaults to
+`https://api.indexnow.org/indexnow`.
+
+Inject the bean and call `submit` with paths or absolute URLs:
+
+[source,java]
+----
+@Inject
+IndexNow indexNow;
+
+public void published(Article article) {
+    indexNow.submit("/articles/" + article.slug());
+}
+----
+
+The request body for the example is:
+
+[source,json]
+----
+{"host":"example.org","key":"0a1b2c3d4e5f6a7b","keyLocation":"https://example.org/0a1b2c3d4e5f6a7b.txt","urlList":["https://example.org/articles/intro"]}
+----
+
+* `submit` needs `quarkus.seo.site-url`. A background job has no request, so no host is safe to use. Without `site-url`,
+`submit` does nothing and logs at DEBUG.
+* If the site is not indexable, `submit` does nothing.
+* A path resolves against the site URL. A URL on another host is dropped.
+* One request holds up to 10,000 URLs. A larger call sends more requests.
+* The call does not block. The returned stage always completes normally, also when the endpoint answers an error or
+no server listens. The extension logs such failures at DEBUG.
+* When IndexNow is enabled, the `IndexNow` bean exists even if your application serves its own key file. Ownership
+skips only the key-file route.
+
+To replace the client, write a bean that implements `IndexNow`. See xref:customizing.adoc[Customizing].
+
+== llms.txt
+
+The extension serves `/llms.txt`. The file is a Markdown list of your pages for language models.
+
+[source,properties]
+----
+quarkus.seo.site-url=https://example.org
+quarkus.seo.site-name=Example
+quarkus.seo.description=Guides for Quarkus developers.
+quarkus.seo.llms-txt.enabled=true
+----
+
+If the sitemap has one titled URL, the output is:
+
+[source,markdown]
+----
+# Example
+
+> Guides for Quarkus developers.
+
+- [Getting started](https://example.org/start)
+----
+
+* The sources are the ones of the sitemap: configuration, `@SitemapEntry` and `SitemapContributor` beans.
+* The file lists only URLs that have a title.
+* If you set no site name, the heading is the base URL.
+* The extension escapes the characters that break a Markdown link in a title.
+* The response is served when the site is not indexable, as the sitemap is.
+* llms.txt has no output cache. The ETag and the `Cache-Control` header still apply.
+
+NOTE: No search engine is known to use llms.txt. Enable it only if you want to offer the file to tools that ask for it.

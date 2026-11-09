@@ -14,9 +14,11 @@ bean or a switch. Status: pre-release. No artifact is on Maven Central yet.
 - Typed schema.org builders for JSON-LD, without Jackson
 - A sitemap from configuration, from `@SitemapEntry` and from your own beans, with an index above 50,000 URLs
 - A robots.txt from rule groups, with presets for AI crawlers
+- Opt-in security.txt, web manifest, IndexNow and llms.txt, all off by default
+- A Dev UI with an overview and a page check that lists content warnings in dev mode
 - No indexing outside the prod profile
 - Optional caching with `quarkus-cache`
-- Replaceable beans for locales, rendering, the sitemap, robots.txt and the base URL
+- Replaceable beans for locales, rendering, the sitemap, robots.txt, the base URL and IndexNow
 - Native image support that needs no configuration
 
 ## Getting Started
@@ -117,6 +119,8 @@ Read the [full documentation](docs/modules/ROOT/pages/index.adoc) for these guid
 - [JSON-LD](docs/modules/ROOT/pages/json-ld.adoc)
 - [Sitemap](docs/modules/ROOT/pages/sitemap.adoc)
 - [robots.txt](docs/modules/ROOT/pages/robots.adoc)
+- [Opt-in outputs](docs/modules/ROOT/pages/opt-in.adoc)
+- [Dev UI](docs/modules/ROOT/pages/dev-ui.adoc)
 - [Customizing](docs/modules/ROOT/pages/customizing.adoc)
 - [Integrating from another extension](docs/modules/ROOT/pages/integrating.adoc)
 - [Native](docs/modules/ROOT/pages/native.adoc)

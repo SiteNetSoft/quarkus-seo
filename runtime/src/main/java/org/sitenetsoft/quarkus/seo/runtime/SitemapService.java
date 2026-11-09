@@ -89,7 +89,7 @@ public class SitemapService {
     }
 
     private Optional<String> generate(String baseUrl, int page) {
-        List<SitemapUrl> urls = collect();
+        List<SitemapUrl> urls = urls();
         int max = Math.max(1, config.sitemap().maxUrls());
         int pages = (urls.size() + max - 1) / max;
         if (page == 0) {
@@ -111,7 +111,14 @@ public class SitemapService {
         return Optional.of(writer.urlSet(urls.subList(from, to), baseUrl, locales.defaultLocale()));
     }
 
-    private List<SitemapUrl> collect() {
+    /**
+     * Collect the URLs of every source, in order: the configured URLs, the {@code @SitemapEntry} URLs and the
+     * contributor URLs.
+     *
+     * @return the URLs, which the caller may change
+     * @throws ContributorException when a contributor fails, after the failure is logged
+     */
+    public List<SitemapUrl> urls() {
         List<SitemapUrl> urls = new ArrayList<>();
         for (String path : config.sitemap().urls().orElse(List.of())) {
             if (path != null && !path.isBlank()) {

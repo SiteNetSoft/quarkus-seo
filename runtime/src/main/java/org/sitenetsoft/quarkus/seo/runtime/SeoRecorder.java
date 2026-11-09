@@ -1,6 +1,8 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -10,11 +12,13 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import org.jboss.logging.Logger;
 
 import io.quarkus.runtime.annotations.Recorder;
+import io.smallrye.config.SmallRyeConfig;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import org.sitenetsoft.quarkus.seo.runtime.devui.SecurityTxtServed;
 
 /**
  * Record build-time findings for the run time.
@@ -88,6 +92,67 @@ public class SeoRecorder {
     }
 
     /**
+     * Create the handler of llms.txt.
+     *
+     * @return the handler that serves the file
+     */
+    public Handler<RoutingContext> llmsTxtHandler() {
+        return new LlmsTxtHandler();
+    }
+
+    /**
+     * Create the handler of security.txt.
+     *
+     * @param underRootPath true when the route sits under the HTTP root path
+     * @return the handler that serves the file
+     */
+    public Handler<RoutingContext> securityTxtHandler(boolean underRootPath) {
+        return new SecurityTxtHandler(underRootPath);
+    }
+
+    /**
+     * Create the handler of the web manifest.
+     *
+     * @return the handler that serves the manifest
+     */
+    public Handler<RoutingContext> manifestHandler() {
+        return new ManifestHandler();
+    }
+
+    /**
+     * Create the supplier of the manifest link holder.
+     *
+     * @param href the href of the link, or an empty string when the extension serves no manifest
+     * @return the supplier of the holder
+     */
+    public Supplier<ManifestLink> manifestLink(String href) {
+        ManifestLink link = new ManifestLink(href.isEmpty() ? Optional.empty() : Optional.of(href));
+        return () -> link;
+    }
+
+    /**
+     * Create the handler of the IndexNow key file.
+     *
+     * @param key the IndexNow key
+     * @return the handler that serves the key
+     */
+    public Handler<RoutingContext> indexNowKeyHandler(String key) {
+        return new IndexNowKeyHandler(key);
+    }
+
+    /**
+     * Create the supplier of the IndexNow key holder.
+     *
+     * @param key the IndexNow key
+     * @param underRootPath true when the key file is served under the HTTP root path
+     * @return the supplier of the holder
+     */
+    public Supplier<IndexNowKey> indexNowKey(String key, boolean underRootPath) {
+        IndexNowKey holder = new IndexNowKey(key, underRootPath);
+        return () -> holder;
+    }
+
+    /**
      * Create a route function that matches GET and HEAD requests on a path.
      *
      * @param path the exact path
@@ -131,6 +196,28 @@ public class SeoRecorder {
         if (sitemapCache || robotsCache) {
             Logger.getLogger(SeoRecorder.class)
                     .info("quarkus.seo cache is enabled but quarkus-cache is not present. Serving without a cache.");
+        }
+    }
+
+    /**
+     * Create the supplier of the holder that tells whether the extension serves security.txt.
+     *
+     * @param served true when the extension serves security.txt
+     * @return the supplier of the holder
+     */
+    public Supplier<SecurityTxtServed> securityTxtServed(boolean served) {
+        SecurityTxtServed holder = new SecurityTxtServed(served);
+        return () -> holder;
+    }
+
+    /**
+     * Log the security.txt content problems once at WARN.
+     */
+    public void logSecurityTxtWarnings() {
+        SeoConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class).getConfigMapping(SeoConfig.class);
+        Logger log = Logger.getLogger(SeoRecorder.class);
+        for (SeoWarning warning : SeoChecks.servedSecurityTxt(config.securityTxt(), true, Instant.now())) {
+            log.warn("SEO check on security.txt: " + warning.message() + " [" + warning.code() + "]");
         }
     }
 }

@@ -44,6 +44,26 @@ final class Urls {
     }
 
     /**
+     * Cut a base URL down to its scheme and authority.
+     *
+     * @param baseUrl the base URL, with or without a path
+     * @return the scheme and authority, with no path, query or trailing slash
+     */
+    static String hostRoot(String baseUrl) {
+        int schemeEnd = baseUrl.indexOf("://");
+        int authorityStart = schemeEnd < 0 ? 0 : schemeEnd + 3;
+        int end = baseUrl.length();
+        for (int i = authorityStart; i < baseUrl.length(); i++) {
+            char c = baseUrl.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        return baseUrl.substring(0, end);
+    }
+
+    /**
      * Keep only the listed query parameters.
      *
      * @param rawQuery the raw query string without the question mark, or null

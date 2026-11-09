@@ -26,8 +26,8 @@ public class BlogContributor implements SitemapContributor {
     public Stream<SitemapUrl> urls() {
         calls.incrementAndGet();
         return Stream.of(
-                SitemapUrl.of("/blog/first").lastmod(Instant.parse("2026-01-15T10:00:00Z")),
-                SitemapUrl.of("/blog/second").lastmod(Instant.parse("2026-02-20T10:00:00Z")));
+                SitemapUrl.of("/blog/first").title("First post").lastmod(Instant.parse("2026-01-15T10:00:00Z")),
+                SitemapUrl.of("/blog/second").title("Second post").lastmod(Instant.parse("2026-02-20T10:00:00Z")));
     }
 
     /**

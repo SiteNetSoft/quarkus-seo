@@ -26,6 +26,8 @@ import io.quarkus.vertx.http.deployment.RouteBuildItem;
 import io.quarkus.vertx.http.deployment.spi.StaticResourcesBuildItem;
 import io.quarkus.vertx.http.runtime.HandlerType;
 import io.smallrye.config.ConfigValue;
+import io.vertx.core.Handler;
+import io.vertx.ext.web.RoutingContext;
 import io.smallrye.config.SmallRyeConfig;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
@@ -36,6 +38,9 @@ import org.sitenetsoft.quarkus.seo.runtime.DefaultRobotsTxtProvider;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoHeadRenderer;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSeoLocales;
 import org.sitenetsoft.quarkus.seo.runtime.DefaultSitemapWriter;
+import org.sitenetsoft.quarkus.seo.runtime.DefaultIndexNow;
+import org.sitenetsoft.quarkus.seo.runtime.IndexNowKey;
+import org.sitenetsoft.quarkus.seo.runtime.ManifestLink;
 import org.sitenetsoft.quarkus.seo.runtime.NoSeoOutputCache;
 import org.sitenetsoft.quarkus.seo.runtime.QuarkusLocaleKeys;
 import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig;
@@ -57,6 +62,9 @@ class SeoProcessor {
     static final String FEATURE = "seo";
     private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
     private static final String ROBOTS_PATH = "/robots.txt";
+    static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
+    static final String LLMS_TXT_PATH = "/llms.txt";
+    private static final Pattern INDEXNOW_KEY = Pattern.compile("[a-zA-Z0-9-]{8,128}");
     private static final String REST_PATH = "quarkus.rest.path";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
@@ -75,38 +83,68 @@ class SeoProcessor {
      * Decide which outputs the extension registers.
      *
      * <p>
-     * An output is off when the master switch or its feature switch is off. The sitemap and robots.txt are also off
-     * when the application serves their path itself, as a static file, a JAX-RS resource or a Reactive Route. A
-     * JAX-RS path includes the {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every
-     * match on {@code /robots.txt} as owned, whatever the root path. The step logs nothing about owned paths.
+     * An output is off when the master switch or its feature switch is off. An output is also off when the
+     * application serves its path itself, as a static file, a JAX-RS resource or a Reactive Route. The step checks the
+     * sitemap, robots.txt, security.txt, the manifest, the IndexNow key file and llms.txt. A JAX-RS path includes the
+     * {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every match on a host-root path
+     * as owned, whatever the root path. The host-root paths are {@code /robots.txt}, {@code /.well-known/security.txt},
+     * the IndexNow key file and {@code /llms.txt}. The step logs nothing about owned paths.
      *
      * @param config the build-time configuration
      * @param index the combined index
      * @param statics the static resources, absent when the application has none
      * @return the outputs
-     * @throws IllegalStateException when a sitemap path holds a colon, an asterisk or whitespace
+     * @throws IllegalStateException when a sitemap or manifest path holds a colon, an asterisk or whitespace, or when
+     *         IndexNow is on and its key is missing or invalid
      */
     @BuildStep
     SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
             Optional<StaticResourcesBuildItem> statics) {
         if (!config.enabled()) {
-            return new SeoOutputsBuildItem(false, false, false, Set.of());
+            return new SeoOutputsBuildItem(false, false, false, false, false, false, false, null, Set.of());
         }
         if (config.sitemap().enabled()) {
             checkPath("quarkus.seo.sitemap.path", config.sitemap().path());
             checkPath("quarkus.seo.sitemap.page-path", config.sitemap().pagePath());
         }
+        if (config.manifest().enabled()) {
+            checkPath("quarkus.seo.manifest.path", config.manifest().path());
+        }
+        String indexNowKeyPath = null;
+        if (config.indexNow().enabled()) {
+            checkIndexNowKey(config.indexNow().key().orElse(null));
+            indexNowKeyPath = "/" + config.indexNow().key().get() + ".txt";
+        }
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
+        String manifestPath = SeoPaths.normalize(config.manifest().path());
         Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index));
         Set<String> owned = new LinkedHashSet<>();
-        for (String path : List.of(sitemapPath, ROBOTS_PATH)) {
+        List<String> candidates = new ArrayList<>(List.of(sitemapPath, ROBOTS_PATH));
+        if (config.securityTxt().enabled()) {
+            candidates.add(SECURITY_TXT_PATH);
+        }
+        if (config.manifest().enabled()) {
+            candidates.add(manifestPath);
+        }
+        if (indexNowKeyPath != null) {
+            candidates.add(indexNowKeyPath);
+        }
+        if (config.llmsTxt().enabled()) {
+            candidates.add(LLMS_TXT_PATH);
+        }
+        for (String path : candidates) {
             if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
                 owned.add(path);
             }
         }
         boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
         boolean robots = config.robots().enabled() && !owned.contains(ROBOTS_PATH);
-        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, owned);
+        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SECURITY_TXT_PATH);
+        boolean manifest = config.manifest().enabled() && !owned.contains(manifestPath);
+        boolean indexNow = config.indexNow().enabled() && !owned.contains(indexNowKeyPath);
+        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(LLMS_TXT_PATH);
+        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, securityTxt, manifest, indexNow,
+                llmsTxt, indexNowKeyPath, owned);
     }
 
     /**
@@ -177,7 +215,7 @@ class SeoProcessor {
     @BuildStep
     void cacheBeans(SeoOutputsBuildItem outputs, Capabilities capabilities,
             BuildProducer<AdditionalBeanBuildItem> beans) {
-        if (!outputs.sitemap() && !outputs.robots()) {
+        if (!outputs.sitemap() && !outputs.robots() && !outputs.llmsTxt()) {
             return;
         }
         beans.produce(AdditionalBeanBuildItem.builder().addBeanClasses(SeoCaches.class).setUnremovable().build());
@@ -200,7 +238,7 @@ class SeoProcessor {
     @BuildStep
     AdditionalIndexedClassesBuildItem indexCacheClass(SeoBuildConfig config, Capabilities capabilities) {
         if (!capabilities.isPresent(Capability.CACHE) || !config.enabled()
-                || !(config.sitemap().enabled() || config.robots().enabled())) {
+                || !(config.sitemap().enabled() || config.robots().enabled() || config.llmsTxt().enabled())) {
             return null;
         }
         return new AdditionalIndexedClassesBuildItem(CACHE_MANAGER_CLASS);
@@ -225,12 +263,15 @@ class SeoProcessor {
     /**
      * Register the sitemap writer and the sitemap service.
      *
+     * <p>
+     * llms.txt reads the same sources, so the beans also exist when the extension serves only llms.txt.
+     *
      * @param outputs the outputs that the extension registers
-     * @return the beans, or null when the extension does not serve the sitemap
+     * @return the beans, or null when the extension serves neither the sitemap nor llms.txt
      */
     @BuildStep
     AdditionalBeanBuildItem sitemapBeans(SeoOutputsBuildItem outputs) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return null;
         }
         return AdditionalBeanBuildItem.builder()
@@ -249,7 +290,7 @@ class SeoProcessor {
     @BuildStep
     void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index,
             BuildProducer<SitemapEntryBuildItem> entries) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return;
         }
         for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index))) {
@@ -263,13 +304,13 @@ class SeoProcessor {
      * @param recorder the recorder
      * @param outputs the outputs that the extension registers
      * @param entries the entries found at build time
-     * @return the synthetic bean, or null when the extension does not serve the sitemap
+     * @return the synthetic bean, or null when the extension serves neither the sitemap nor llms.txt
      */
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
     SyntheticBeanBuildItem sitemapEntriesBean(SeoRecorder recorder, SeoOutputsBuildItem outputs,
             List<SitemapEntryBuildItem> entries) {
-        if (!outputs.sitemap()) {
+        if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return null;
         }
         List<String> paths = new ArrayList<>();
@@ -317,6 +358,59 @@ class SeoProcessor {
     }
 
     /**
+     * Register the web manifest route under the HTTP root path.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void manifestRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.manifest()) {
+            return;
+        }
+        routes.produce(RouteBuildItem.builder()
+                .routeFunction(recorder.getRoute(SeoPaths.normalize(config.manifest().path())))
+                .handler(recorder.manifestHandler())
+                // The handler does no I/O, so it runs on the event loop.
+                .handlerType(HandlerType.NORMAL)
+                .build());
+    }
+
+    /**
+     * Record the href of the manifest link as a bean.
+     *
+     * <p>
+     * The href is empty when the extension serves no manifest.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @return the synthetic bean, or null when the meta feature is switched off
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    SyntheticBeanBuildItem manifestLink(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!outputs.meta()) {
+            return null;
+        }
+        String href = "";
+        if (outputs.manifest()) {
+            String rootPath = SeoSettings.normalizeRootPath(ConfigProvider.getConfig()
+                    .getOptionalValue("quarkus.http.root-path", String.class).orElse("/"));
+            href = rootPath + SeoPaths.normalize(config.manifest().path());
+        }
+        return SyntheticBeanBuildItem.configure(ManifestLink.class)
+                .scope(Singleton.class)
+                .unremovable()
+                .supplier(recorder.manifestLink(href))
+                .done();
+    }
+
+    /**
      * Register the default robots.txt provider.
      *
      * @param outputs the outputs that the extension registers
@@ -353,19 +447,167 @@ class SeoProcessor {
         if (!outputs.robots()) {
             return;
         }
-        if (config.robots().serveUnderRootPath()) {
-            routes.produce(RouteBuildItem.builder()
-                    .routeFunction(recorder.getRoute(ROBOTS_PATH))
-                    .handler(recorder.robotsHandler())
-                    .handlerType(HandlerType.BLOCKING)
-                    .build());
+        routes.produce(hostRootRoute(ROBOTS_PATH, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Register the security.txt route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true. It registers no bean.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void securityTxtRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.securityTxt()) {
             return;
         }
-        routes.produce(nonApplicationRootPath.routeBuilder()
-                .routeFunction(ROBOTS_PATH, recorder.getAndHead())
-                .handler(recorder.robotsHandler())
+        boolean underRootPath = config.securityTxt().serveUnderRootPath();
+        routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Register the llms.txt route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void llmsTxtRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.llmsTxt()) {
+            return;
+        }
+        routes.produce(hostRootRoute(LLMS_TXT_PATH, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Register the IndexNow key file route.
+     *
+     * <p>
+     * The route sits on the host root unless {@code serve-under-root-path} is true.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs that the extension registers
+     * @param nonApplicationRootPath the non-application root path build item
+     * @param routes the producer of the routes
+     */
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void indexNowRoute(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs,
+            NonApplicationRootPathBuildItem nonApplicationRootPath, BuildProducer<RouteBuildItem> routes) {
+        if (!outputs.indexNow()) {
+            return;
+        }
+        routes.produce(hostRootRoute(outputs.indexNowKeyPath().get(),
+                recorder.indexNowKeyHandler(config.indexNow().key().get()), config.indexNow().serveUnderRootPath(),
+                recorder, nonApplicationRootPath));
+    }
+
+    /**
+     * Record the IndexNow key as a bean.
+     *
+     * <p>
+     * The bean exists whenever IndexNow is on, also when the application serves the key file itself.
+     *
+     * @param recorder the recorder
+     * @param config the build-time configuration
+     * @param outputs the outputs, which carry the key check
+     * @return the synthetic bean, or null when the extension or IndexNow is off
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    SyntheticBeanBuildItem indexNowKey(SeoRecorder recorder, SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!indexNowClient(config)) {
+            return null;
+        }
+        return SyntheticBeanBuildItem.configure(IndexNowKey.class)
+                .scope(Singleton.class)
+                .unremovable()
+                .supplier(recorder.indexNowKey(config.indexNow().key().get(), config.indexNow().serveUnderRootPath()))
+                .done();
+    }
+
+    /**
+     * Register the default IndexNow client.
+     *
+     * <p>
+     * The bean exists whenever IndexNow is on, also when the application serves the key file itself.
+     *
+     * @param config the build-time configuration
+     * @param outputs the outputs, which carry the key check
+     * @return the bean, or null when the extension or IndexNow is off
+     */
+    @BuildStep
+    AdditionalBeanBuildItem indexNowBeans(SeoBuildConfig config, SeoOutputsBuildItem outputs) {
+        if (!indexNowClient(config)) {
+            return null;
+        }
+        return AdditionalBeanBuildItem.builder().addBeanClasses(DefaultIndexNow.class).setUnremovable().build();
+    }
+
+    /**
+     * Build a route that sits on the host root unless the output is served under the root path.
+     *
+     * @param path the output path
+     * @param handler the handler of the route
+     * @param underRootPath true when the route sits under the HTTP root path
+     * @param recorder the recorder
+     * @param nonApplicationRootPath the non-application root path build item
+     * @return the route build item
+     */
+    private RouteBuildItem hostRootRoute(String path, Handler<RoutingContext> handler, boolean underRootPath,
+            SeoRecorder recorder, NonApplicationRootPathBuildItem nonApplicationRootPath) {
+        if (underRootPath) {
+            return RouteBuildItem.builder()
+                    .routeFunction(recorder.getRoute(path))
+                    .handler(handler)
+                    .handlerType(HandlerType.BLOCKING)
+                    .build();
+        }
+        return nonApplicationRootPath.routeBuilder()
+                .routeFunction(path, recorder.getAndHead())
+                .handler(handler)
                 .handlerType(HandlerType.BLOCKING)
-                .build());
+                .build();
+    }
+
+    /**
+     * Tell whether the extension registers the IndexNow client: the master switch and the IndexNow switch are on.
+     */
+    private static boolean indexNowClient(SeoBuildConfig config) {
+        return config.enabled() && config.indexNow().enabled();
+    }
+
+    /**
+     * Check the IndexNow key.
+     *
+     * @param key the configured key, or null when absent
+     * @throws IllegalStateException when the key is missing or does not hold 8 to 128 letters, digits or dashes
+     */
+    static void checkIndexNowKey(String key) {
+        if (key == null || !INDEXNOW_KEY.matcher(key).matches()) {
+            throw new IllegalStateException(
+                    "quarkus.seo.indexnow.key must hold 8 to 128 letters, digits or dashes when IndexNow is on");
+        }
     }
 
     /**

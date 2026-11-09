@@ -1,9 +1,12 @@
 package org.sitenetsoft.quarkus.seo.runtime;
 
+import java.util.Optional;
+
 import io.quarkus.runtime.annotations.ConfigPhase;
 import io.quarkus.runtime.annotations.ConfigRoot;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
+import io.smallrye.config.WithName;
 
 /**
  * Switch features on or off and set output paths at build time.
@@ -47,6 +50,35 @@ public interface SeoBuildConfig {
      * @return the robots group
      */
     RobotsBuild robots();
+
+    /**
+     * Configure the security.txt feature.
+     *
+     * @return the security.txt group
+     */
+    SecurityTxtBuild securityTxt();
+
+    /**
+     * Configure the web manifest feature.
+     *
+     * @return the manifest group
+     */
+    ManifestBuild manifest();
+
+    /**
+     * Configure the IndexNow feature.
+     *
+     * @return the IndexNow group
+     */
+    @WithName("indexnow")
+    IndexNowBuild indexNow();
+
+    /**
+     * Configure the llms.txt feature.
+     *
+     * @return the llms.txt group
+     */
+    LlmsTxtBuild llmsTxt();
 
     /**
      * Build-time keys of the meta tag feature.
@@ -121,6 +153,101 @@ public interface SeoBuildConfig {
 
         /**
          * Serve robots.txt under the HTTP root path instead of the host root.
+         *
+         * @return true when the file is served under the root path
+         */
+        @WithDefault("false")
+        boolean serveUnderRootPath();
+    }
+
+    /**
+     * Build-time keys of the security.txt feature.
+     */
+    interface SecurityTxtBuild {
+
+        /**
+         * Register the security.txt route.
+         *
+         * @return true when security.txt is registered
+         */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * Serve security.txt under the HTTP root path instead of the host root.
+         *
+         * @return true when the file is served under the root path
+         */
+        @WithDefault("false")
+        boolean serveUnderRootPath();
+    }
+
+    /**
+     * Build-time keys of the web manifest feature.
+     */
+    interface ManifestBuild {
+
+        /**
+         * Register the web manifest route.
+         *
+         * @return true when the manifest is registered
+         */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * Set the path of the web manifest.
+         *
+         * @return the path
+         */
+        @WithDefault("/manifest.webmanifest")
+        String path();
+    }
+
+    /**
+     * Build-time keys of the IndexNow feature.
+     */
+    interface IndexNowBuild {
+
+        /**
+         * Register the IndexNow key file route and the IndexNow client.
+         *
+         * @return true when IndexNow is registered
+         */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * Set the IndexNow key. The key holds 8 to 128 letters, digits or dashes.
+         *
+         * @return the key, absent when not set
+         */
+        Optional<String> key();
+
+        /**
+         * Serve the key file under the HTTP root path instead of the host root.
+         *
+         * @return true when the file is served under the root path
+         */
+        @WithDefault("false")
+        boolean serveUnderRootPath();
+    }
+
+    /**
+     * Build-time keys of the llms.txt feature.
+     */
+    interface LlmsTxtBuild {
+
+        /**
+         * Register the llms.txt route.
+         *
+         * @return true when llms.txt is registered
+         */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * Serve llms.txt under the HTTP root path instead of the host root.
          *
          * @return true when the file is served under the root path
          */

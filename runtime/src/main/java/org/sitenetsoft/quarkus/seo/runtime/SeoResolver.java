@@ -7,11 +7,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import org.sitenetsoft.quarkus.seo.ResolvedSeo;
 import org.sitenetsoft.quarkus.seo.SeoLocales;
+import org.sitenetsoft.quarkus.seo.runtime.devui.SeoDevCapture;
 import org.sitenetsoft.quarkus.seo.schema.JsonLd;
 import org.sitenetsoft.quarkus.seo.schema.Organization;
 import org.sitenetsoft.quarkus.seo.schema.SchemaNode;
@@ -29,6 +31,20 @@ public class SeoResolver {
     private final SeoLocales locales;
     private final SeoConfig config;
     private final SeoBuildConfig buildConfig;
+    private final ManifestLink manifestLink;
+    private final Instance<SeoDevCapture> capture;
+
+    /**
+     * Create the resolver with no manifest link.
+     *
+     * @param settings the resolved site settings
+     * @param locales the site locales
+     * @param config the run-time configuration
+     * @param buildConfig the build-time configuration
+     */
+    public SeoResolver(SeoSettings settings, SeoLocales locales, SeoConfig config, SeoBuildConfig buildConfig) {
+        this(settings, locales, config, buildConfig, new ManifestLink(Optional.empty()), null);
+    }
 
     /**
      * Create the resolver.
@@ -37,13 +53,18 @@ public class SeoResolver {
      * @param locales the site locales
      * @param config the run-time configuration
      * @param buildConfig the build-time configuration
+     * @param manifestLink the href of the manifest link, as the build found it
+     * @param capture the dev mode capture, never resolvable outside dev mode
      */
     @Inject
-    public SeoResolver(SeoSettings settings, SeoLocales locales, SeoConfig config, SeoBuildConfig buildConfig) {
+    public SeoResolver(SeoSettings settings, SeoLocales locales, SeoConfig config, SeoBuildConfig buildConfig,
+            ManifestLink manifestLink, Instance<SeoDevCapture> capture) {
         this.settings = settings;
         this.locales = locales;
         this.config = config;
         this.buildConfig = buildConfig;
+        this.manifestLink = manifestLink;
+        this.capture = capture;
     }
 
     /**
@@ -103,11 +124,15 @@ public class SeoResolver {
         String twitterCard = merged.twitterCard() != null ? merged.twitterCard()
                 : image.isPresent() ? "summary_large_image" : "summary";
 
-        return new ResolvedSeo(title, Optional.ofNullable(merged.description()), robots(merged), canonical,
+        ResolvedSeo resolved = new ResolvedSeo(title, Optional.ofNullable(merged.description()), robots(merged), canonical,
                 hreflang(merged, pageLocale, canonical, base), type, ogTitle, settings.siteName(),
                 pageLocale.toString(), alternateLocales, image, article, twitterCard,
                 config.twitter().site(), config.twitter().creator(), verification(),
-                config.themeColor(), List.copyOf(merged.extraMeta()), jsonLd(merged, request));
+                config.themeColor(), List.copyOf(merged.extraMeta()), jsonLd(merged, request), manifestLink.href());
+        if (capture != null && request.isPresent() && capture.isResolvable()) {
+            capture.get().record(request.get().path(), resolved);
+        }
+        return resolved;
     }
 
     /**

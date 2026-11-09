@@ -43,6 +43,7 @@ public class DefaultSeoHeadRenderer implements SeoHeadRenderer {
         meta(out, "name", "twitter:creator", seo.twitterCreator().orElse(null));
         metas(out, seo.verification());
         meta(out, "name", "theme-color", seo.themeColor().orElse(null));
+        seo.manifest().ifPresent(href -> link(out, "manifest", null, href));
         metas(out, seo.extraMeta());
         if (seo.jsonLd() != null && !seo.jsonLd().isBlank()) {
             out.append("<script type=\"application/ld+json\">").append(seo.jsonLd()).append("</script>\n");

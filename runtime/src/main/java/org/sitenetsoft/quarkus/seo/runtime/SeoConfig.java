@@ -145,6 +145,28 @@ public interface SeoConfig {
     Robots robots();
 
     /**
+     * Configure the security.txt content.
+     *
+     * @return the security.txt group
+     */
+    SecurityTxt securityTxt();
+
+    /**
+     * Configure the web manifest content.
+     *
+     * @return the manifest group
+     */
+    Manifest manifest();
+
+    /**
+     * Configure the IndexNow client.
+     *
+     * @return the IndexNow group
+     */
+    @WithName("indexnow")
+    IndexNowConfig indexNow();
+
+    /**
      * Choose which crawlers the AI preset blocks.
      */
     enum AiPreset {
@@ -416,6 +438,167 @@ public interface SeoConfig {
          * @return the crawler tokens
          */
         Optional<List<String>> search();
+    }
+
+    /**
+     * Keys of the security.txt content.
+     */
+    interface SecurityTxt {
+
+        /**
+         * List the contact URIs. A value without a scheme that holds an at sign gets the {@code mailto:} scheme.
+         * Without a contact, the path answers 404.
+         *
+         * @return the contacts
+         */
+        Optional<List<String>> contact();
+
+        /**
+         * Set the expiry date as an ISO 8601 date or date-time. A value that does not parse is left out.
+         *
+         * @return the expiry
+         */
+        Optional<String> expires();
+
+        /**
+         * Set the URL of the encryption key.
+         *
+         * @return the key URL
+         */
+        Optional<String> encryption();
+
+        /**
+         * Set the URL of the disclosure policy.
+         *
+         * @return the policy URL
+         */
+        Optional<String> policy();
+
+        /**
+         * List the preferred languages as language tags.
+         *
+         * @return the language tags
+         */
+        Optional<List<String>> preferredLanguages();
+
+        /**
+         * Set the URL of the hiring page.
+         *
+         * @return the hiring URL
+         */
+        Optional<String> hiring();
+    }
+
+    /**
+     * Keys of the IndexNow client.
+     */
+    interface IndexNowConfig {
+
+        /**
+         * Set the IndexNow endpoint that receives the submissions.
+         *
+         * @return the endpoint URL
+         */
+        @WithDefault("https://api.indexnow.org/indexnow")
+        String endpoint();
+    }
+
+    /**
+     * Choose the display mode of the web manifest.
+     */
+    enum Display {
+        /** Use the whole screen. */
+        FULLSCREEN,
+        /** Look like a standalone application. */
+        STANDALONE,
+        /** Look like a standalone application with a minimal set of browser controls. */
+        MINIMAL_UI,
+        /** Open in a browser tab. */
+        BROWSER
+    }
+
+    /**
+     * Keys of the web manifest content.
+     */
+    interface Manifest {
+
+        /**
+         * Set the application name. When unset, the site name applies.
+         *
+         * @return the name
+         */
+        Optional<String> name();
+
+        /**
+         * Set the short application name.
+         *
+         * @return the short name
+         */
+        Optional<String> shortName();
+
+        /**
+         * Set the start URL. A value that starts with a slash gets the HTTP root path in front. When unset or
+         * blank, the start URL is the root path.
+         *
+         * @return the start URL
+         */
+        Optional<String> startUrl();
+
+        /**
+         * Set the display mode.
+         *
+         * @return the display mode
+         */
+        Optional<Display> display();
+
+        /**
+         * Set the theme color. When unset, {@code quarkus.seo.theme-color} applies.
+         *
+         * @return the color
+         */
+        Optional<String> themeColor();
+
+        /**
+         * Set the background color.
+         *
+         * @return the color
+         */
+        Optional<String> backgroundColor();
+
+        /**
+         * Define icons by name. The manifest lists them in the order of their names.
+         *
+         * @return the icons
+         */
+        Map<String, Icon> icons();
+    }
+
+    /**
+     * Keys of one web manifest icon.
+     */
+    interface Icon {
+
+        /**
+         * Set the icon URL. A value that starts with a slash gets the HTTP root path in front. The manifest leaves out
+         * an icon that has no URL.
+         *
+         * @return the URL
+         */
+        Optional<String> src();
+
+        /**
+         * Set the icon sizes, for example {@code 192x192}.
+         *
+         * @return the sizes
+         */
+        Optional<String> sizes();
+
+        /**
+         * Set the media type of the icon.
+         *
+         * @return the media type
+         */
+        Optional<String> type();
     }
 
     /**
