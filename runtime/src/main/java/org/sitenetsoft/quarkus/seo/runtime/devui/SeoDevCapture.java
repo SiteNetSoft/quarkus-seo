@@ -81,9 +81,10 @@ public class SeoDevCapture {
      * Forget the stored result of a path and mark the path as logged.
      *
      * <p>
-     * The Dev UI calls this method before it fetches a page. The next result of the path is stored and read. The path
-     * stays marked as logged for the rest of the dev session, so neither the Dev UI fetch nor later browsing logs its
-     * warnings. The Dev UI shows them instead.
+     * The Dev UI calls this method before it fetches any page: the checked page, its hreflang alternates and every
+     * sitemap URL. The next result of the path is stored and read. The path stays marked as logged until the next live
+     * reload, which replaces this bean and clears the marks. Neither the Dev UI fetch nor later browsing logs the
+     * warnings of a logged path. The Dev UI shows them instead.
      *
      * @param path the request path, relative to the HTTP root path
      */
