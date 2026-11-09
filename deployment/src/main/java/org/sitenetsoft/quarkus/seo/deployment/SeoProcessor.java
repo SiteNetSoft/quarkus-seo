@@ -65,7 +65,6 @@ class SeoProcessor {
     static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
     static final String LLMS_TXT_PATH = "/llms.txt";
     private static final Pattern INDEXNOW_KEY = Pattern.compile("[a-zA-Z0-9-]{8,128}");
-    private static final String REST_PATH = "quarkus.rest.path";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
 
@@ -86,19 +85,20 @@ class SeoProcessor {
      * An output is off when the master switch or its feature switch is off. An output is also off when the
      * application serves its path itself, as a static file, a JAX-RS resource or a Reactive Route. The step checks the
      * sitemap, robots.txt, security.txt, the manifest, the IndexNow key file and llms.txt. A JAX-RS path includes the
-     * {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every match on a host-root path
+     * {@code @ApplicationPath} or REST path prefix. The step treats every match on a host-root path
      * as owned, whatever the root path. The host-root paths are {@code /robots.txt}, {@code /.well-known/security.txt},
      * the IndexNow key file and {@code /llms.txt}. The step logs nothing about owned paths.
      *
      * @param config the build-time configuration
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @param statics the static resources, absent when the application has none
      * @return the outputs
      * @throws IllegalStateException when a sitemap or manifest path holds a colon, an asterisk or whitespace, or when
      *         IndexNow is on and its key is missing or invalid
      */
     @BuildStep
-    SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
+    SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index, Capabilities capabilities,
             Optional<StaticResourcesBuildItem> statics) {
         if (!config.enabled()) {
             return new SeoOutputsBuildItem(false, false, false, false, false, false, false, null, Set.of());
@@ -117,7 +117,7 @@ class SeoProcessor {
         }
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
         String manifestPath = SeoPaths.normalize(config.manifest().path());
-        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index));
+        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index, capabilities));
         Set<String> owned = new LinkedHashSet<>();
         List<String> candidates = new ArrayList<>(List.of(sitemapPath, ROBOTS_PATH));
         if (config.securityTxt().enabled()) {
@@ -285,15 +285,16 @@ class SeoProcessor {
      *
      * @param outputs the outputs that the extension registers
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @param entries the producer of the entries
      */
     @BuildStep
-    void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index,
+    void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index, Capabilities capabilities,
             BuildProducer<SitemapEntryBuildItem> entries) {
         if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return;
         }
-        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index))) {
+        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index, capabilities))) {
             entries.produce(entry);
         }
     }
@@ -652,10 +653,12 @@ class SeoProcessor {
      * Return the JAX-RS prefix of the application.
      *
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @return the prefix, or an empty string for the root
      */
-    private static String jaxrsPrefix(CombinedIndexBuildItem index) {
-        Optional<String> restPath = ConfigProvider.getConfig().getOptionalValue(REST_PATH, String.class);
+    private static String jaxrsPrefix(CombinedIndexBuildItem index, Capabilities capabilities) {
+        String key = RestPaths.restPathKey(capabilities.isPresent(Capability.RESTEASY));
+        Optional<String> restPath = ConfigProvider.getConfig().getOptionalValue(key, String.class);
         return RestPaths.prefix(index.getIndex(), restPath);
     }
 

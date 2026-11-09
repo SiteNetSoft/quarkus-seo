@@ -347,6 +347,11 @@ The sitemap combines three sources:
    `Stream<SitemapUrl> urls()`. The stream is read on a worker thread and closed after use, so
    a contributor can stream from a database cursor.
 
+The path of an annotated method includes the JAX-RS prefix. Under Quarkus REST, the prefix comes
+from `@ApplicationPath` or `quarkus.rest.path`. Under RESTEasy Classic, it comes from
+`@ApplicationPath` or `quarkus.resteasy.path`. The extension reads only the key of the REST stack
+that is present.
+
 `SitemapUrl` holds:
 - `loc` (relative or absolute)
 - `lastmod` (optional)
@@ -497,7 +502,7 @@ All of these are off by default. Each one has a build-time `enabled` key.
   no route, bean or filter.
 - **Application files win.** At build time the extension checks for its paths among:
   - static resources (`META-INF/resources/robots.txt` and the others)
-  - JAX-RS resource paths, with the `@ApplicationPath` or `quarkus.rest.path` prefix
+  - JAX-RS resource paths, with the `@ApplicationPath` prefix or the REST path key of the stack in use
   - Reactive Routes paths
 
   If the application has any of them, the extension does not register its own route for that
