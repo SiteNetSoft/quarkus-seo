@@ -456,7 +456,7 @@ This task assumes spike 1 gave the expected result. Otherwise use the fallback r
   - Tag name `seo`. Parameters: `title`, `absoluteTitle`, `description`, `canonical`, `type`, `image`, `imageWidth`, `imageHeight`, `imageAlt`, `locale` (a BCP 47 string), `noindex`, `nofollow`, `noimageindex`, `twitterCard`, `author`, `section`. An unknown parameter name fails the build with a message that lists the known names.
   - `seo:` namespace methods: `title`, `description`, `canonical`, `image`, `locale`, `siteName`. Each returns the resolved `String`, or an empty string.
   - `Seo.head()` returns `renderer.render(resolve())`.
-  - Build step: when `meta.enabled` and `enabled` are true, register `Seo`, `SeoResolver`, `DefaultSeoHeadRenderer`, and both Qute classes as indexed classes.
+  - Build step: when `meta.enabled` and `enabled` are true, register `Seo`, `SeoResolver`, `DefaultSeoHeadRenderer` and both Qute classes with `AdditionalBeanBuildItem`. Qute reads `@EngineConfiguration` and `@TemplateExtension` classes from the bean archive index only. Spike 1 of Task 2 shows that `AdditionalIndexedClassesBuildItem` alone leaves the tag and the namespace unregistered.
 
 - [ ] **Step 1: Write the failing tests.**
   - `SeoTagTest` uses a JAX-RS resource with `@Inject Seo seo` that returns a `TemplateInstance`. The template is `<head>{#seo title="About" description="Tag" /}</head><h1>{seo:title}</h1>`.
@@ -470,7 +470,7 @@ This task assumes spike 1 gave the expected result. Otherwise use the fallback r
 
 - [ ] **Step 2: Run them.** `mvn -B -ntp -pl deployment -am verify -Dtest='SeoTag*,SeoJavaRenderTest,UnknownTagParameterTest' -Dsurefire.failIfNoSpecifiedTests=false`. Expected: FAIL.
 
-- [ ] **Step 3: Implement the factory.** In `initializeBlock`, check the parameter names. In `resolve`, evaluate the parameters, build a tag `SeoValues`, store it on the request `Seo` through `Seo.tagValues(...)`, and render through `SeoHeadRenderer`. With no active request context, use a fresh `Seo` that is not stored. The `seo:` methods resolve through the same request `Seo`, so they see the tag values after the head has rendered.
+- [ ] **Step 3: Implement the factory.** In `initializeBlock`, check the parameter names. Qute passes every named parameter to `BlockInfo.getParameters()` under its own name, and each positional parameter under its index, such as `0`. Throw `block.error(...)` with `.origin(block.getOrigin())` and pass the names through `.argument(...)`. A literal brace in the message breaks the message template. In `resolve`, evaluate the parameters, build a tag `SeoValues`, store it on the request `Seo` through `Seo.tagValues(...)`, and render through `SeoHeadRenderer`. With no active request context, use a fresh `Seo` that is not stored. The `seo:` methods resolve through the same request `Seo`, so they see the tag values after the head has rendered.
 
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 
@@ -645,7 +645,7 @@ This task assumes spike 2 gave the expected result.
 
 - [ ] **Step 3: Run them.** Expected: FAIL.
 
-- [ ] **Step 4: Implement.** The Cache-Control value reuses `sitemap.cache-control`. Register the route with the absolute-path API found in spike 2 when the root path is not `/` and `serve-under-root-path` is false.
+- [ ] **Step 4: Implement.** The Cache-Control value reuses `sitemap.cache-control`. When `serve-under-root-path` is false, register the route with `NonApplicationRootPathBuildItem.routeBuilder().route("/robots.txt")`. The absolute path puts it on the host root when the root path is not `/`, and under `/` otherwise. When `serve-under-root-path` is true, register it with `RouteBuildItem.builder().route("/robots.txt")`, which puts it under the root path.
 
 - [ ] **Step 5: Run the tests.** Expected: PASS.
 
@@ -664,7 +664,9 @@ This task assumes spike 3 gave the expected result.
 
 **Interfaces:**
 - Produces:
-  - `final class OwnedPaths`: `static Set<String> fromIndex(IndexView index)` (JAX-RS and `@Route` paths, normalized with a leading `/` and no trailing `/`), `static boolean ownedStatic(ApplicationArchivesBuildItem archives, String path)`.
+  - `final class OwnedPaths`: `static Set<String> fromIndex(IndexView index)` (JAX-RS and `@Route` paths, normalized with a leading `/` and no trailing `/`), `static boolean ownedStatic(Optional<StaticResourcesBuildItem> statics, String path)`. `StaticResourcesBuildItem` comes from `io.quarkus.vertx.http.deployment.spi` and lists the `META-INF/resources` files of every jar. `ApplicationArchivesBuildItem` misses jars that have no index, so spike 3 of Task 2 replaced it.
+  - `fromIndex` reads the annotation names `jakarta.ws.rs.Path`, `io.quarkus.vertx.web.Route` and `io.quarkus.vertx.web.RouteBase` as `DotName` strings, so the deployment module needs no REST or Reactive Routes dependency. It joins the class `@Path` with the method `@Path`, and the `@RouteBase` path with the `@Route` path. It skips interfaces, because REST client interfaces also carry `@Path`.
+  - Known limits for the docs: the `@ApplicationPath` and `quarkus.rest.path` prefixes, `@Route` methods with no `path`, and `regex` routes are not detected.
   - `final class SeoOutputsBuildItem extends SimpleBuildItem`: `boolean meta()`, `boolean sitemap()`, `boolean robots()`, `Set<String> ownedByApplication()`. Tasks 7, 8, 10 and 11 read it in place of the raw config switches.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -705,9 +707,9 @@ This task assumes spike 4 gave the expected result.
 **Interfaces:**
 - Produces:
   - `interface SeoOutputCache`: `String get(String cacheName, String key, Supplier<String> compute)`, `void invalidateAll(String cacheName)`. Cache names `seo-sitemap` and `seo-robots`. The key is `baseUrl + "|" + page`.
-  - `NoSeoOutputCache` always calls `compute`. `CacheManagerSeoOutputCache` uses `CacheManager.getCache(name)` and `Cache.get(key, k -> compute.get())`, blocking with `await().indefinitely()` on the worker thread.
+  - `NoSeoOutputCache` always calls `compute`. `CacheManagerSeoOutputCache` injects `@CacheName("seo-sitemap") Cache` and `@CacheName("seo-robots") Cache`. Quarkus creates only the caches it finds by name at build time, so `CacheManager.getCache(name)` alone returns an empty `Optional`. It calls `Cache.get(key, k -> compute.get())` and blocks with `await().indefinitely()` on the worker thread.
   - `@Singleton public class SeoCaches`: `void invalidateSitemap()`, `void invalidateRobots()`.
-  - Build step: register `CacheManagerSeoOutputCache` when `Capabilities.isPresent(Capability.CACHE)` and a cache key is enabled. Otherwise register `NoSeoOutputCache`.
+  - Build step: register `CacheManagerSeoOutputCache` when `Capabilities.isPresent(Capability.CACHE)` and a cache key is enabled. Otherwise register `NoSeoOutputCache`. Name the class as a string. Register it with `AdditionalBeanBuildItem` and also with `AdditionalIndexedClassesBuildItem`, because the cache extension reads `@CacheName` from the combined index.
   - Recorder method `logCacheMissing()`. Call it at runtime init when a cache key is enabled and the capability is absent. It logs one INFO line: `quarkus.seo cache is enabled but quarkus-cache is not present. Serving without a cache.`
 
 - [ ] **Step 1: Write the failing test.** `CacheWithoutQuarkusCacheTest` sets `quarkus.seo.sitemap.cache.enabled=true`. Check that:

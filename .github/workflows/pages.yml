@@ -1,0 +1,52 @@
+name: Deploy docs to GitHub Pages
+
+# The site is the standalone HTML that the docs module renders from the Antora pages in docs/modules/ROOT,
+# with the configuration reference generated from the extension, so the docs cannot drift from the code.
+# The build fails on any Asciidoctor warning, such as a missing include, so a broken page never reaches Pages.
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - docs/**
+      - runtime/src/main/java/**
+      - deployment/src/main/java/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build the docs
+        run: mvn -B -ntp -T 4 package -Pdocs -DskipTests
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/target/generated-docs
+
+  deploy:
+    needs: build
+    # no tags exist; pinned to the master commit of 2026-08-22
+    uses: SiteNetSoft/GitHub-Actions/.github/workflows/deploy-pages.yml@12137ac4ca02e9a5a0c057ba499f3496eddeac6b

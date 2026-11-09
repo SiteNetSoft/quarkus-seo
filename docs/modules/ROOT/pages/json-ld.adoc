@@ -1,0 +1,78 @@
+= JSON-LD
+include::./includes/attributes.adoc[]
+
+The extension writes https://schema.org[schema.org] data as JSON-LD. It writes the data itself and needs no JSON
+library. The extension only writes JSON-LD. It never reads or expands it.
+
+The `{#seo}` tag writes one `<script type="application/ld+json">` element. The element holds an `@context` of
+`https://schema.org` and an `@graph` of nodes. Nodes link to each other with `@id` values built from the base URL.
+The extension escapes `</` in the output, so content cannot close the script element.
+
+== Typed builders
+
+The package `org.sitenetsoft.quarkus.seo.schema` holds the builders. The package uses only the JDK.
+
+[cols="1,3"]
+|===
+|Builder |Purpose
+
+|`Organization`
+|An organization with `name`, `url`, `logo` and `sameAs`.
+
+|`WebSite`
+|A website with `name`, `url` and `publisher`.
+
+|`BreadcrumbList`
+|A trail of pages. Call `item(name, url)` once for each step.
+
+|`Article`
+|An article with `headline`, `description`, `image`, `datePublished`, `dateModified` and `author`.
+
+|`SchemaNode`
+|Any other type. Call `SchemaNode.of("Product")` and then `set` or `add` for each property.
+|===
+
+Add a node to the page with `seo.jsonLd(node)`:
+
+[source,java]
+----
+seo.jsonLd(Article.create()
+        .headline(page.title())
+        .description(page.summary())
+        .datePublished(page.publishedAt())
+        .author("Jane Doe"));
+
+seo.jsonLd(BreadcrumbList.create()
+        .item("Home", "/")
+        .item("Blog", "/blog"));
+----
+
+`set` replaces a property. `add` appends a value to a property, so the property becomes a list.
+
+== Raw JSON
+
+If you already have JSON-LD, call `seo.jsonLdRaw(json)`. The string must be one JSON object. The extension does not
+parse it. It escapes `</` and embeds the object in the graph.
+
+[source,java]
+----
+seo.jsonLdRaw("""
+        {"@type": "Product", "name": "Widget"}
+        """);
+----
+
+== Site-wide nodes
+
+The extension adds two nodes on the home page only. The home page is the path `/` under the root path.
+
+* An `Organization` node from `quarkus.seo.organization.*`.
+* A `WebSite` node from the site name and the site URL.
+
+Each node has a switch. Set `quarkus.seo.organization.enabled=false` or `quarkus.seo.website.enabled=false` to leave
+it out.
+
+The extension writes no `SearchAction`. Google retired the sitelinks search box.
+
+== Switch the feature off
+
+Set `quarkus.seo.json-ld.enabled=false` at build time. The `{#seo}` tag then writes no JSON-LD.

@@ -1,0 +1,5 @@
+name: quarkus-seo
+title: SEO
+version: dev
+nav:
+  - modules/ROOT/nav.adoc
