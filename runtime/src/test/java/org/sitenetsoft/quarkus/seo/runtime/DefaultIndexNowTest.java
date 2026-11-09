@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +25,7 @@ class DefaultIndexNowTest {
 
     private HttpServer server;
     private final List<String> received = new CopyOnWriteArrayList<>();
+    private final CountDownLatch release = new CountDownLatch(1);
     private String endpoint;
 
     @BeforeEach
@@ -33,12 +36,21 @@ class DefaultIndexNowTest {
             exchange.sendResponseHeaders(202, -1);
             exchange.close();
         });
+        server.createContext("/slow", exchange -> {
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
         server.start();
         endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/indexnow";
     }
 
     @AfterEach
     void stop() {
+        release.countDown();
         server.stop(0);
     }
 
@@ -98,6 +110,27 @@ class DefaultIndexNowTest {
     @Test
     void noSiteUrlDoesNothing() throws Exception {
         indexNow(Optional.empty(), false).submit("/a").toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertThat(received).isEmpty();
+    }
+
+    @Test
+    void closeDoesNotWaitForASlowEndpoint() throws Exception {
+        SeoSettings settings = new SeoSettings(Optional.empty(), true, null, Optional.empty(), "/");
+        DefaultIndexNow indexNow = new DefaultIndexNow(HttpClient.newHttpClient(),
+                endpoint.replace("/indexnow", "/slow"), new IndexNowKey("abcd1234", false), settings,
+                Optional.of("https://ex.com"));
+        CompletionStage<Void> stage = indexNow.submit("/a");
+        long start = System.nanoTime();
+        indexNow.close();
+        assertThat(System.nanoTime() - start).isLessThan(TimeUnit.SECONDS.toNanos(2));
+        stage.toCompletableFuture().get(2, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void submitAfterCloseCompletesNormally() throws Exception {
+        DefaultIndexNow indexNow = indexNow(Optional.of("https://ex.com"), false);
+        indexNow.close();
+        indexNow.submit("/a").toCompletableFuture().get(2, TimeUnit.SECONDS);
         assertThat(received).isEmpty();
     }
 }

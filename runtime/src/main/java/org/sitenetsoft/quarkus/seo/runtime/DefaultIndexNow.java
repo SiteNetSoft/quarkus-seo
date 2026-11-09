@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -72,6 +73,19 @@ public class DefaultIndexNow implements IndexNow {
         this.key = key;
         this.settings = settings;
         this.siteUrl = siteUrl;
+    }
+
+    /**
+     * Shut down the HTTP client without waiting for requests in flight.
+     * A submission that this cuts short is lost, as if the endpoint had failed.
+     */
+    @PreDestroy
+    void close() {
+        try {
+            client.shutdownNow();
+        } catch (RuntimeException e) {
+            LOG.debugf(e, "IndexNow client shutdown failed");
+        }
     }
 
     @Override
