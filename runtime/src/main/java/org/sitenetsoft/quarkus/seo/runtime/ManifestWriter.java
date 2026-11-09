@@ -4,8 +4,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.TreeMap;
 
-import org.sitenetsoft.quarkus.seo.schema.JsonWriter;
-
 /**
  * Write the JSON text of a web manifest.
  */
@@ -77,9 +75,9 @@ final class ManifestWriter {
             return;
         }
         separator(out, first);
-        JsonWriter.string(out, key);
+        Json.string(out, key);
         out.append(':');
-        JsonWriter.string(out, value);
+        Json.string(out, value);
     }
 
     private static void separator(StringBuilder out, boolean[] first) {

@@ -23,7 +23,6 @@ import org.jboss.logging.Logger;
 
 import io.quarkus.arc.DefaultBean;
 import org.sitenetsoft.quarkus.seo.IndexNow;
-import org.sitenetsoft.quarkus.seo.schema.JsonWriter;
 
 /**
  * Submit URLs to the IndexNow endpoint with the JDK HTTP client.
@@ -169,18 +168,18 @@ public class DefaultIndexNow implements IndexNow {
         List<String> bodies = new ArrayList<>();
         for (int from = 0; from < urls.size(); from += MAX_URLS) {
             StringBuilder out = new StringBuilder("{\"host\":");
-            JsonWriter.string(out, host);
+            Json.string(out, host);
             out.append(",\"key\":");
-            JsonWriter.string(out, key);
+            Json.string(out, key);
             out.append(",\"keyLocation\":");
-            JsonWriter.string(out, keyLocation);
+            Json.string(out, keyLocation);
             out.append(",\"urlList\":[");
             int to = Math.min(urls.size(), from + MAX_URLS);
             for (int i = from; i < to; i++) {
                 if (i > from) {
                     out.append(',');
                 }
-                JsonWriter.string(out, urls.get(i));
+                Json.string(out, urls.get(i));
             }
             bodies.add(out.append("]}").toString());
         }

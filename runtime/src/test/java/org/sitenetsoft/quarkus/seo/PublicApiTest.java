@@ -15,7 +15,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -23,15 +25,23 @@ import org.junit.jupiter.api.Test;
 class PublicApiTest {
 
     private static final String PACKAGE = "org.sitenetsoft.quarkus.seo";
+    private static final String SCHEMA = PACKAGE + ".schema";
     private static final String INTERNAL = PACKAGE + ".runtime.";
 
     @Test
     void publicSignaturesExposeNoInternalType() throws Exception {
         List<String> leaks = new ArrayList<>();
-        List<Class<?>> types = publicTypes();
+        List<Class<?>> types = publicTypes(PACKAGE);
+        types.addAll(publicTypes(SCHEMA));
         assertThat(types).contains(Seo.class, SeoCaches.class, ResolvedSeo.Meta.class, IndexNow.class);
         for (Class<?> type : types) {
+            Set<Method> methods = new LinkedHashSet<>(List.of(type.getMethods()));
             for (Method method : type.getDeclaredMethods()) {
+                if (Modifier.isProtected(method.getModifiers())) {
+                    methods.add(method);
+                }
+            }
+            for (Method method : methods) {
                 if (visible(method.getModifiers()) && !method.isSynthetic()) {
                     check(leaks, type.getName() + "#" + method.getName(), method.getGenericReturnType());
                     for (Type parameter : method.getGenericParameterTypes()) {
@@ -53,6 +63,13 @@ class PublicApiTest {
             }
         }
         assertThat(leaks).isEmpty();
+    }
+
+    @Test
+    void schemaPackageExposesOnlyTheDocumentedTypes() throws Exception {
+        assertThat(publicTypes(SCHEMA)).extracting(Class::getSimpleName)
+                .containsExactlyInAnyOrder("Article", "BreadcrumbList", "JsonLd", "Organization", "SchemaNode",
+                        "WebSite");
     }
 
     private static boolean visible(int modifiers) {
@@ -85,9 +102,9 @@ class PublicApiTest {
         }
     }
 
-    private static List<Class<?>> publicTypes() throws IOException, URISyntaxException, ClassNotFoundException {
+    private static List<Class<?>> publicTypes(String packageName) throws IOException, URISyntaxException, ClassNotFoundException {
         Path directory = Path.of(Seo.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                .resolve(PACKAGE.replace('.', '/'));
+                .resolve(packageName.replace('.', '/'));
         List<Class<?>> types = new ArrayList<>();
         try (Stream<Path> files = Files.list(directory)) {
             for (Path file : files.toList()) {
@@ -95,7 +112,7 @@ class PublicApiTest {
                 if (!name.endsWith(".class") || name.equals("package-info.class")) {
                     continue;
                 }
-                Class<?> type = Class.forName(PACKAGE + "." + name.substring(0, name.length() - ".class".length()),
+                Class<?> type = Class.forName(packageName + "." + name.substring(0, name.length() - ".class".length()),
                         false, PublicApiTest.class.getClassLoader());
                 if (Modifier.isPublic(type.getModifiers()) && !type.isAnonymousClass()) {
                     types.add(type);

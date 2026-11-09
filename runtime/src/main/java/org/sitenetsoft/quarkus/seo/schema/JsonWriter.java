@@ -14,7 +14,7 @@ import java.util.List;
  * <p>
  * This class is internal. Application code does not use it.
  */
-public final class JsonWriter {
+final class JsonWriter {
 
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
@@ -98,7 +98,7 @@ public final class JsonWriter {
      * @param out the target
      * @param text the text to quote
      */
-    public static void string(StringBuilder out, String text) {
+    static void string(StringBuilder out, String text) {
         out.append('"');
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
