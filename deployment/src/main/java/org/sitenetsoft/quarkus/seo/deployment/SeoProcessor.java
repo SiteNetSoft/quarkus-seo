@@ -61,9 +61,6 @@ class SeoProcessor {
 
     static final String FEATURE = "seo";
     private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
-    private static final String ROBOTS_PATH = "/robots.txt";
-    static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
-    static final String LLMS_TXT_PATH = "/llms.txt";
     private static final Pattern INDEXNOW_KEY = Pattern.compile("[a-zA-Z0-9-]{8,128}");
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
@@ -119,9 +116,9 @@ class SeoProcessor {
         String manifestPath = SeoPaths.normalize(config.manifest().path());
         Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index, capabilities));
         Set<String> owned = new LinkedHashSet<>();
-        List<String> candidates = new ArrayList<>(List.of(sitemapPath, ROBOTS_PATH));
+        List<String> candidates = new ArrayList<>(List.of(sitemapPath, SeoPaths.ROBOTS_TXT));
         if (config.securityTxt().enabled()) {
-            candidates.add(SECURITY_TXT_PATH);
+            candidates.add(SeoPaths.SECURITY_TXT);
         }
         if (config.manifest().enabled()) {
             candidates.add(manifestPath);
@@ -130,7 +127,7 @@ class SeoProcessor {
             candidates.add(indexNowKeyPath);
         }
         if (config.llmsTxt().enabled()) {
-            candidates.add(LLMS_TXT_PATH);
+            candidates.add(SeoPaths.LLMS_TXT);
         }
         for (String path : candidates) {
             if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
@@ -138,11 +135,11 @@ class SeoProcessor {
             }
         }
         boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
-        boolean robots = config.robots().enabled() && !owned.contains(ROBOTS_PATH);
-        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SECURITY_TXT_PATH);
+        boolean robots = config.robots().enabled() && !owned.contains(SeoPaths.ROBOTS_TXT);
+        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SeoPaths.SECURITY_TXT);
         boolean manifest = config.manifest().enabled() && !owned.contains(manifestPath);
         boolean indexNow = config.indexNow().enabled() && !owned.contains(indexNowKeyPath);
-        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(LLMS_TXT_PATH);
+        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(SeoPaths.LLMS_TXT);
         return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, securityTxt, manifest, indexNow,
                 llmsTxt, indexNowKeyPath, owned);
     }
@@ -448,7 +445,7 @@ class SeoProcessor {
         if (!outputs.robots()) {
             return;
         }
-        routes.produce(hostRootRoute(ROBOTS_PATH, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.ROBOTS_TXT, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
@@ -472,7 +469,7 @@ class SeoProcessor {
             return;
         }
         boolean underRootPath = config.securityTxt().serveUnderRootPath();
-        routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
+        routes.produce(hostRootRoute(SeoPaths.SECURITY_TXT, recorder.securityTxtHandler(underRootPath), underRootPath,
                 recorder, nonApplicationRootPath));
     }
 
@@ -495,7 +492,7 @@ class SeoProcessor {
         if (!outputs.llmsTxt()) {
             return;
         }
-        routes.produce(hostRootRoute(LLMS_TXT_PATH, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.LLMS_TXT, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
