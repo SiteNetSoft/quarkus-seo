@@ -581,8 +581,9 @@ public class SeoValues {
      *
      * <p>
      * Each field set here replaces the field of the lower layer. The title and the absolute title form one group.
-     * The image, its width, its height and its alt text form another group. When this layer sets any field of a
-     * group, the whole group comes from this layer. The lists hold the lower entries first.
+     * The group is replaced whole. For the image group, a layer that sets the image replaces the image, its width,
+     * its height and its alt text. A layer that sets only the width, the height or the alt text keeps the lower
+     * image and replaces just those fields. The lists hold the lower entries first.
      *
      * @param lower the layer below this one
      * @return a new object with the merged values
