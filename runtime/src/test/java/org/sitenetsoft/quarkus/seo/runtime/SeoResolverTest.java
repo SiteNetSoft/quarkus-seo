@@ -85,6 +85,14 @@ class SeoResolverTest {
     }
 
     @Test
+    void javaAltKeepsTheTagImage() {
+        ResolvedSeo.Image image = resolve(new SeoValues().image("/t.png"), new SeoValues().imageAlt("Java alt"))
+                .image().orElseThrow();
+        assertThat(image.url()).endsWith("/t.png");
+        assertThat(image.alt()).isEqualTo("Java alt");
+    }
+
+    @Test
     void higherImageDropsTheSizeAndAltOfTheLowerImage() {
         SeoValues tag = new SeoValues().image("/tag.png").imageWidth(1200).imageHeight(630).imageAlt("Tag");
         ResolvedSeo.Image image = resolve(tag, new SeoValues().image("/java.png")).image().orElseThrow();

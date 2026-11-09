@@ -608,12 +608,21 @@ public class SeoValues {
         if (source.type != null) {
             type = source.type;
         }
-        if (source.image != null || source.imageWidth != null || source.imageHeight != null
-                || source.imageAlt != null) {
+        if (source.image != null) {
             image = source.image;
             imageWidth = source.imageWidth;
             imageHeight = source.imageHeight;
             imageAlt = source.imageAlt;
+        } else {
+            if (source.imageWidth != null) {
+                imageWidth = source.imageWidth;
+            }
+            if (source.imageHeight != null) {
+                imageHeight = source.imageHeight;
+            }
+            if (source.imageAlt != null) {
+                imageAlt = source.imageAlt;
+            }
         }
         if (source.author != null) {
             author = source.author;

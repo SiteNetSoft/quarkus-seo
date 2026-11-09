@@ -21,11 +21,16 @@ as not set, on the tag and in Java.
 A higher layer replaces only the fields that it sets. Setting a title does not clear the image. Lists such as
 alternates and JSON-LD nodes add to the lower layer.
 
-Some fields form a group. The title and the absolute title are one group. The image, its width, its height and its
-alt text are another group. When a higher layer sets any field of a group, the whole group comes from that layer. A
-field of the group that the higher layer does not set stays unset. For example, an image from Java drops the width,
-the height and the alt text of the image in the tag. The key `quarkus.seo.image-alt` applies only to the image of
-`quarkus.seo.image`.
+Some fields form a group. The title and the absolute title are one group. When a higher layer sets either, the whole
+group comes from that layer.
+
+The image, its width, its height and its alt text are another group, keyed on the image. When a higher layer sets the
+image, the whole group comes from that layer. A field that the layer does not set stays unset. For example, an image
+from Java drops the width, the height and the alt text of the image in the tag. When a higher layer sets only the
+width, the height or the alt text, it keeps the image of the lower layer and replaces just those fields. For example,
+`imageAlt("Java alt")` in Java keeps the image of the tag and changes its alt text.
+
+The key `quarkus.seo.image-alt` applies only to the image of `quarkus.seo.image`.
 
 === Set values in the template
 

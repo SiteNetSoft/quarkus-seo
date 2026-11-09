@@ -35,6 +35,34 @@ class SeoValuesTest {
     }
 
     @Test
+    void altAloneKeepsTheLowerImage() {
+        SeoValues lower = new SeoValues().image("/a.png").imageWidth(100).imageAlt("A");
+        SeoValues merged = new SeoValues().imageAlt("B").over(lower);
+        assertThat(merged.image()).isEqualTo("/a.png");
+        assertThat(merged.imageWidth()).isEqualTo(100);
+        assertThat(merged.imageAlt()).isEqualTo("B");
+    }
+
+    @Test
+    void sizeAloneKeepsTheLowerImage() {
+        SeoValues lower = new SeoValues().image("/a.png").imageAlt("A");
+        SeoValues merged = new SeoValues().imageWidth(200).imageHeight(100).over(lower);
+        assertThat(merged.image()).isEqualTo("/a.png");
+        assertThat(merged.imageWidth()).isEqualTo(200);
+        assertThat(merged.imageHeight()).isEqualTo(100);
+        assertThat(merged.imageAlt()).isEqualTo("A");
+    }
+
+    @Test
+    void imageReplacesTheWholeGroup() {
+        SeoValues lower = new SeoValues().image("/a.png").imageWidth(100).imageAlt("A");
+        SeoValues merged = new SeoValues().image("/b.png").over(lower);
+        assertThat(merged.image()).isEqualTo("/b.png");
+        assertThat(merged.imageWidth()).isNull();
+        assertThat(merged.imageAlt()).isNull();
+    }
+
+    @Test
     void listsAddLowerFirst() {
         SeoValues merged = new SeoValues().alternate(Locale.FRENCH, "/fr")
                 .over(new SeoValues().alternate(Locale.ENGLISH, "/en"));

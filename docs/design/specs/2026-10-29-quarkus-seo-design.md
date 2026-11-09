@@ -246,8 +246,10 @@ the designer's call.
 A higher layer replaces only the fields it sets. Setting a title does not clear the image.
 Lists such as alternates and JSON-LD nodes add to the lower layer. They do not replace it.
 
-Some fields merge as a group. The title and the absolute title are one group. The image, its size and its alt text
-are another. A layer that sets any field of a group replaces the whole group of the lower layers.
+Some fields merge as a group. The title and the absolute title are one group. A layer that sets any field of this
+group replaces the whole group of the lower layers. The image, its size and its alt text are another group, keyed on
+the image. A layer that sets the image replaces the whole group, and the fields it leaves unset become empty. A layer
+that sets only the width, the height or the alt text keeps the lower image and replaces just the fields it sets.
 
 ### 5.3 Computed values
 
