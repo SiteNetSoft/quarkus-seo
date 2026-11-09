@@ -21,6 +21,16 @@ public final class SeoPaths {
     }
 
     /**
+     * Build the path of the IndexNow key file.
+     *
+     * @param key the IndexNow key
+     * @return the key file path, for example {@code /abc123.txt}
+     */
+    public static String indexNowKey(String key) {
+        return "/" + key + ".txt";
+    }
+
+    /**
      * Normalize a path.
      *
      * <p>

@@ -31,9 +31,9 @@ public TemplateInstance products() {
 Only the value `-1` means that `priority` is unset. Any other value must be between 0.0 and 1.0.
 +
 The sitemap path of the method includes the JAX-RS prefix. An `@ApplicationPath` on an `Application` subclass sets
-that prefix. Without one, a build-time key sets it: `quarkus.rest.path` under Quarkus REST, `quarkus.resteasy.path` under
-RESTEasy Classic. With `quarkus.rest.path=/api`, the method
-above appears in the sitemap as `/api/products`. Reactive Routes take no JAX-RS prefix.
+that prefix. Without one, a build-time key sets it: `quarkus.rest.path` under Quarkus REST,
+`quarkus.resteasy.path` under RESTEasy Classic. With `quarkus.rest.path=/api`, the method above appears in the
+sitemap as `/api/products`. Reactive Routes take no JAX-RS prefix.
 
 Beans::
 Write a CDI bean that implements `SitemapContributor`. Its `urls()` method returns a `Stream<SitemapUrl>`. The

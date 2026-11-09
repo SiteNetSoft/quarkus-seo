@@ -42,8 +42,8 @@ final class RestPaths {
      *
      * <p>
      * An {@code @ApplicationPath} on an {@code Application} subclass wins, as in Quarkus REST. Without one, the
-     * value of the REST path key applies. See {@link #restPathKey(boolean)}. When several classes carry the annotation, the class whose name
-     * sorts first wins.
+     * value of the REST path key applies. See {@link #restPathKey(boolean)}. When several classes carry the annotation,
+     * the class whose name sorts first wins.
      *
      * @param index the combined index of the application
      * @param restPath the value of the REST path key, empty when the key is not set

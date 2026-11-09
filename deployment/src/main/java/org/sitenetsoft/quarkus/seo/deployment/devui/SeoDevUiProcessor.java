@@ -158,7 +158,9 @@ public class SeoDevUiProcessor {
                 .getOptionalValue("quarkus.http.root-path", String.class).orElse("/"));
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
         String manifestPath = SeoPaths.normalize(config.manifest().path());
-        String indexNowPath = config.indexNow().key().isPresent() ? "/" + config.indexNow().key().get() + ".txt" : "";
+        String indexNowPath = config.indexNow().key().isPresent()
+                ? SeoPaths.indexNowKey(config.indexNow().key().get())
+                : "";
         List<Map<String, String>> rows = new ArrayList<>();
         rows.add(row("meta", "", outputs.meta() ? EXTENSION : OFF));
         rows.add(row("sitemap", rootPath + sitemapPath, servedBy(outputs.sitemap(), outputs, sitemapPath)));

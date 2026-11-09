@@ -102,7 +102,8 @@ class PublicApiTest {
         }
     }
 
-    private static List<Class<?>> publicTypes(String packageName) throws IOException, URISyntaxException, ClassNotFoundException {
+    private static List<Class<?>> publicTypes(String packageName)
+            throws IOException, URISyntaxException, ClassNotFoundException {
         Path directory = Path.of(Seo.class.getProtectionDomain().getCodeSource().getLocation().toURI())
                 .resolve(packageName.replace('.', '/'));
         List<Class<?>> types = new ArrayList<>();

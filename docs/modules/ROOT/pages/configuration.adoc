@@ -36,7 +36,8 @@ The extension uses these Quarkus keys as they are:
 * `quarkus.http.root-path` is the prefix of endpoints and generated links. The extension does not append it to
 `quarkus.seo.site-url`. The site URL is the public URL of the application root, so it must hold any public path
 prefix itself.
-* An `@ApplicationPath` annotation is the prefix of the `@SitemapEntry` paths. Without one, `quarkus.rest.path` sets it under Quarkus REST and `quarkus.resteasy.path` under RESTEasy Classic.
+* An `@ApplicationPath` annotation is the prefix of the `@SitemapEntry` paths. Without one,
+`quarkus.rest.path` sets it under Quarkus REST and `quarkus.resteasy.path` under RESTEasy Classic.
 * `quarkus.http.proxy.*` controls which forwarded headers Quarkus trusts.
 * `quarkus.http.enable-compression` controls gzip of the sitemap.
 * `quarkus.cache.*` configures the caches `seo-sitemap` and `seo-robots`.

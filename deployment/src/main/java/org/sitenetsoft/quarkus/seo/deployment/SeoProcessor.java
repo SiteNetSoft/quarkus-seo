@@ -110,7 +110,7 @@ class SeoProcessor {
         String indexNowKeyPath = null;
         if (config.indexNow().enabled()) {
             checkIndexNowKey(config.indexNow().key().orElse(null));
-            indexNowKeyPath = "/" + config.indexNow().key().get() + ".txt";
+            indexNowKeyPath = SeoPaths.indexNowKey(config.indexNow().key().get());
         }
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
         String manifestPath = SeoPaths.normalize(config.manifest().path());
@@ -291,7 +291,8 @@ class SeoProcessor {
         if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return;
         }
-        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index, capabilities))) {
+        String prefix = jaxrsPrefix(index, capabilities);
+        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), prefix)) {
             entries.produce(entry);
         }
     }
@@ -445,7 +446,8 @@ class SeoProcessor {
         if (!outputs.robots()) {
             return;
         }
-        routes.produce(hostRootRoute(SeoPaths.ROBOTS_TXT, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.ROBOTS_TXT, recorder.robotsHandler(),
+                config.robots().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
@@ -492,7 +494,8 @@ class SeoProcessor {
         if (!outputs.llmsTxt()) {
             return;
         }
-        routes.produce(hostRootRoute(SeoPaths.LLMS_TXT, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.LLMS_TXT, recorder.llmsTxtHandler(),
+                config.llmsTxt().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 

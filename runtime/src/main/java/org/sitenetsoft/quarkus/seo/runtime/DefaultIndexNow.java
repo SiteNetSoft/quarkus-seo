@@ -130,7 +130,7 @@ public class DefaultIndexNow implements IndexNow {
         if (urls.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        String file = "/" + key.key() + ".txt";
+        String file = SeoPaths.indexNowKey(key.key());
         String keyLocation = key.underRootPath() ? Urls.absolute(base, file) : Urls.hostRoot(base) + file;
         List<CompletableFuture<Void>> requests = new ArrayList<>();
         for (String body : body(host, key.key(), keyLocation, new ArrayList<>(urls))) {

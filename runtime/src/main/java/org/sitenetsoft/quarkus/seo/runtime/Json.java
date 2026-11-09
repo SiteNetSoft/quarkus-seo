@@ -36,7 +36,7 @@ public final class Json {
                 case '\r' -> out.append("\\r");
                 case '\t' -> out.append("\\t");
                 default -> {
-                    if (c < 0x20 || c == ' ' || c == ' ' || c == '<') {
+                    if (c < 0x20 || c == '\u2028' || c == '\u2029' || c == '<') {
                         out.append("\\u").append(HEX[(c >> 12) & 0xF]).append(HEX[(c >> 8) & 0xF])
                                 .append(HEX[(c >> 4) & 0xF]).append(HEX[c & 0xF]);
                     } else {

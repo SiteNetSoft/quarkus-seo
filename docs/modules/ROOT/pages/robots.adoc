@@ -68,7 +68,8 @@ If your application serves its own `/robots.txt`, the extension serves none. Thi
 resource and for a Reactive Route. It holds under a root path other than `/` too.
 
 A JAX-RS path includes the JAX-RS prefix. An `@ApplicationPath` on an `Application` subclass sets that prefix.
-Without one, `quarkus.rest.path` sets it under Quarkus REST and `quarkus.resteasy.path` under RESTEasy Classic. With `quarkus.rest.path=/api`, a resource at `@Path("/robots.txt")`
+Without one, `quarkus.rest.path` sets it under Quarkus REST and `quarkus.resteasy.path` under RESTEasy Classic.
+With `quarkus.rest.path=/api`, a resource at `@Path("/robots.txt")`
 answers `/api/robots.txt`. The extension then still serves `/robots.txt`.
 
 The build checks for the conflict. It does not see these cases:

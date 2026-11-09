@@ -13,7 +13,7 @@ class JsonEscapingParityTest {
 
     @ParameterizedTest
     @ValueSource(strings = { "", "plain", "a\"b", "back\\slash", "</script>", "\u0000\u0001\u001f", "\n\r\t\b\f",
-            "  ", "é😀" })
+            "\u2028\u2029", "é😀" })
     void bothWritersEscapeAlike(String text) {
         StringBuilder schema = new StringBuilder();
         StringBuilder runtime = new StringBuilder();
