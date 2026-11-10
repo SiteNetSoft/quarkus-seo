@@ -105,5 +105,6 @@ SEO check on /about: The page has no description. [missing-description]
 At start, the extension logs the security.txt warnings the same way. It does so only when it serves a security.txt
 file that has at least one contact. The log lines appear in dev mode only.
 
-The page check and the sitemap check do not log. They show their warnings in the Dev UI. A path that the Dev UI
-fetched does not log its warnings when you open it in the browser later.
+The page check and the sitemap check do not log. They show their warnings in the Dev UI. Each check marks every page
+it fetches, hreflang alternates included, as logged. The console does not log those pages' warnings again until the
+next live reload, not even when you open a page in the browser. The Dev UI shows them instead.

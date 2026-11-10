@@ -8,7 +8,26 @@ package org.sitenetsoft.quarkus.seo.runtime;
  */
 public final class SeoPaths {
 
+    /** The path of the robots file, relative to the host root or the root path. */
+    public static final String ROBOTS_TXT = "/robots.txt";
+
+    /** The path of the security contact file, relative to the host root or the root path. */
+    public static final String SECURITY_TXT = "/.well-known/security.txt";
+
+    /** The path of the llms.txt file, relative to the host root or the root path. */
+    public static final String LLMS_TXT = "/llms.txt";
+
     private SeoPaths() {
+    }
+
+    /**
+     * Build the path of the IndexNow key file.
+     *
+     * @param key the IndexNow key
+     * @return the key file path, for example {@code /abc123.txt}
+     */
+    public static String indexNowKey(String key) {
+        return "/" + key + ".txt";
     }
 
     /**

@@ -11,8 +11,6 @@ import org.sitenetsoft.quarkus.seo.BaseUrlResolver;
  * Serve security.txt on a worker thread.
  */
 final class SecurityTxtHandler implements Handler<RoutingContext> {
-
-    private static final String PATH = "/.well-known/security.txt";
     private static final String CONTENT_TYPE = "text/plain; charset=utf-8";
 
     private final boolean underRootPath;
@@ -36,7 +34,7 @@ final class SecurityTxtHandler implements Handler<RoutingContext> {
         SeoConfig config = Arc.container().instance(SeoConfig.class).get();
         String baseUrl = Arc.container().instance(BaseUrlResolver.class).get().resolve(context);
         String root = underRootPath ? Urls.absolute(baseUrl, "") : Urls.hostRoot(baseUrl);
-        Optional<String> body = SecurityTxtWriter.write(config.securityTxt(), root + PATH);
+        Optional<String> body = SecurityTxtWriter.write(config.securityTxt(), root + SeoPaths.SECURITY_TXT);
         if (body.isEmpty()) {
             context.response().setStatusCode(404).end();
             return;

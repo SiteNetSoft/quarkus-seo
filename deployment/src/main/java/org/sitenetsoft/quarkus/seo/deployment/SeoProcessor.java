@@ -61,11 +61,7 @@ class SeoProcessor {
 
     static final String FEATURE = "seo";
     private static final String CACHE_MANAGER_CLASS = "org.sitenetsoft.quarkus.seo.runtime.CacheManagerSeoOutputCache";
-    private static final String ROBOTS_PATH = "/robots.txt";
-    static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
-    static final String LLMS_TXT_PATH = "/llms.txt";
     private static final Pattern INDEXNOW_KEY = Pattern.compile("[a-zA-Z0-9-]{8,128}");
-    private static final String REST_PATH = "quarkus.rest.path";
     private static final String PAGE_TOKEN = "{n}";
     private static final String PAGE_GROUP = "([1-9][0-9]*)";
 
@@ -86,19 +82,20 @@ class SeoProcessor {
      * An output is off when the master switch or its feature switch is off. An output is also off when the
      * application serves its path itself, as a static file, a JAX-RS resource or a Reactive Route. The step checks the
      * sitemap, robots.txt, security.txt, the manifest, the IndexNow key file and llms.txt. A JAX-RS path includes the
-     * {@code @ApplicationPath} or {@code quarkus.rest.path} prefix. The step treats every match on a host-root path
+     * {@code @ApplicationPath} or REST path prefix. The step treats every match on a host-root path
      * as owned, whatever the root path. The host-root paths are {@code /robots.txt}, {@code /.well-known/security.txt},
      * the IndexNow key file and {@code /llms.txt}. The step logs nothing about owned paths.
      *
      * @param config the build-time configuration
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @param statics the static resources, absent when the application has none
      * @return the outputs
      * @throws IllegalStateException when a sitemap or manifest path holds a colon, an asterisk or whitespace, or when
      *         IndexNow is on and its key is missing or invalid
      */
     @BuildStep
-    SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index,
+    SeoOutputsBuildItem outputs(SeoBuildConfig config, CombinedIndexBuildItem index, Capabilities capabilities,
             Optional<StaticResourcesBuildItem> statics) {
         if (!config.enabled()) {
             return new SeoOutputsBuildItem(false, false, false, false, false, false, false, null, Set.of());
@@ -113,15 +110,15 @@ class SeoProcessor {
         String indexNowKeyPath = null;
         if (config.indexNow().enabled()) {
             checkIndexNowKey(config.indexNow().key().orElse(null));
-            indexNowKeyPath = "/" + config.indexNow().key().get() + ".txt";
+            indexNowKeyPath = SeoPaths.indexNowKey(config.indexNow().key().get());
         }
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
         String manifestPath = SeoPaths.normalize(config.manifest().path());
-        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index));
+        Set<String> appPaths = OwnedPaths.fromIndex(index.getIndex(), jaxrsPrefix(index, capabilities));
         Set<String> owned = new LinkedHashSet<>();
-        List<String> candidates = new ArrayList<>(List.of(sitemapPath, ROBOTS_PATH));
+        List<String> candidates = new ArrayList<>(List.of(sitemapPath, SeoPaths.ROBOTS_TXT));
         if (config.securityTxt().enabled()) {
-            candidates.add(SECURITY_TXT_PATH);
+            candidates.add(SeoPaths.SECURITY_TXT);
         }
         if (config.manifest().enabled()) {
             candidates.add(manifestPath);
@@ -130,7 +127,7 @@ class SeoProcessor {
             candidates.add(indexNowKeyPath);
         }
         if (config.llmsTxt().enabled()) {
-            candidates.add(LLMS_TXT_PATH);
+            candidates.add(SeoPaths.LLMS_TXT);
         }
         for (String path : candidates) {
             if (appPaths.contains(path) || OwnedPaths.ownedStatic(statics, path)) {
@@ -138,11 +135,11 @@ class SeoProcessor {
             }
         }
         boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
-        boolean robots = config.robots().enabled() && !owned.contains(ROBOTS_PATH);
-        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SECURITY_TXT_PATH);
+        boolean robots = config.robots().enabled() && !owned.contains(SeoPaths.ROBOTS_TXT);
+        boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SeoPaths.SECURITY_TXT);
         boolean manifest = config.manifest().enabled() && !owned.contains(manifestPath);
         boolean indexNow = config.indexNow().enabled() && !owned.contains(indexNowKeyPath);
-        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(LLMS_TXT_PATH);
+        boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(SeoPaths.LLMS_TXT);
         return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, securityTxt, manifest, indexNow,
                 llmsTxt, indexNowKeyPath, owned);
     }
@@ -285,15 +282,17 @@ class SeoProcessor {
      *
      * @param outputs the outputs that the extension registers
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @param entries the producer of the entries
      */
     @BuildStep
-    void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index,
+    void sitemapEntries(SeoOutputsBuildItem outputs, CombinedIndexBuildItem index, Capabilities capabilities,
             BuildProducer<SitemapEntryBuildItem> entries) {
         if (!outputs.sitemap() && !outputs.llmsTxt()) {
             return;
         }
-        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), jaxrsPrefix(index))) {
+        String prefix = jaxrsPrefix(index, capabilities);
+        for (SitemapEntryBuildItem entry : SitemapEntryScanner.scan(index.getIndex(), prefix)) {
             entries.produce(entry);
         }
     }
@@ -447,7 +446,8 @@ class SeoProcessor {
         if (!outputs.robots()) {
             return;
         }
-        routes.produce(hostRootRoute(ROBOTS_PATH, recorder.robotsHandler(), config.robots().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.ROBOTS_TXT, recorder.robotsHandler(),
+                config.robots().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
@@ -471,7 +471,7 @@ class SeoProcessor {
             return;
         }
         boolean underRootPath = config.securityTxt().serveUnderRootPath();
-        routes.produce(hostRootRoute(SECURITY_TXT_PATH, recorder.securityTxtHandler(underRootPath), underRootPath,
+        routes.produce(hostRootRoute(SeoPaths.SECURITY_TXT, recorder.securityTxtHandler(underRootPath), underRootPath,
                 recorder, nonApplicationRootPath));
     }
 
@@ -494,7 +494,8 @@ class SeoProcessor {
         if (!outputs.llmsTxt()) {
             return;
         }
-        routes.produce(hostRootRoute(LLMS_TXT_PATH, recorder.llmsTxtHandler(), config.llmsTxt().serveUnderRootPath(),
+        routes.produce(hostRootRoute(SeoPaths.LLMS_TXT, recorder.llmsTxtHandler(),
+                config.llmsTxt().serveUnderRootPath(),
                 recorder, nonApplicationRootPath));
     }
 
@@ -652,10 +653,12 @@ class SeoProcessor {
      * Return the JAX-RS prefix of the application.
      *
      * @param index the combined index
+     * @param capabilities the capabilities of the application
      * @return the prefix, or an empty string for the root
      */
-    private static String jaxrsPrefix(CombinedIndexBuildItem index) {
-        Optional<String> restPath = ConfigProvider.getConfig().getOptionalValue(REST_PATH, String.class);
+    private static String jaxrsPrefix(CombinedIndexBuildItem index, Capabilities capabilities) {
+        String key = RestPaths.restPathKey(capabilities.isPresent(Capability.RESTEASY));
+        Optional<String> restPath = ConfigProvider.getConfig().getOptionalValue(key, String.class);
         return RestPaths.prefix(index.getIndex(), restPath);
     }
 

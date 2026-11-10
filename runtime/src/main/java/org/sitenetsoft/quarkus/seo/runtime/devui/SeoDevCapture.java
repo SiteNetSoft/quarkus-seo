@@ -20,13 +20,16 @@ import org.sitenetsoft.quarkus.seo.runtime.SeoWarning;
  * slash. A caller that fetches a page adds the root path in front of the key and reads the result with the key.
  *
  * <p>
- * The bean exists in dev mode only. The capture keeps at most 1,000 paths and drops the oldest path first.
+ * The bean exists in dev mode only. The capture keeps the heads of at most 1,000 paths and drops the oldest head
+ * first. It remembers at most 10,000 logged paths and drops the oldest path first. The logged set has the larger bound
+ * because a logged path costs one key, and a sitemap check marks every URL of the sitemap.
  */
 @Singleton
 public class SeoDevCapture {
 
     private static final Logger LOG = Logger.getLogger("org.sitenetsoft.quarkus.seo.runtime.SeoDevCapture");
     private static final int MAX_PATHS = 1000;
+    private static final int MAX_LOGGED = 10_000;
 
     private final Map<String, ResolvedSeo> captured = new LinkedHashMap<>() {
         @Override
@@ -38,7 +41,7 @@ public class SeoDevCapture {
     private final Map<String, Boolean> logged = new LinkedHashMap<>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
-            return size() > MAX_PATHS;
+            return size() > MAX_LOGGED;
         }
     };
 
@@ -78,8 +81,10 @@ public class SeoDevCapture {
      * Forget the stored result of a path and mark the path as logged.
      *
      * <p>
-     * The Dev UI calls this method before it fetches a page. The next result of the path is stored and read, but its
-     * warnings do not log, because the Dev UI shows them.
+     * The Dev UI calls this method before it fetches any page: the checked page, its hreflang alternates and every
+     * sitemap URL. The next result of the path is stored and read. The path stays marked as logged until the next live
+     * reload, which replaces this bean and clears the marks. Neither the Dev UI fetch nor later browsing logs the
+     * warnings of a logged path. The Dev UI shows them instead.
      *
      * @param path the request path, relative to the HTTP root path
      */
@@ -87,6 +92,18 @@ public class SeoDevCapture {
         synchronized (captured) {
             captured.remove(path);
             logged.put(path, Boolean.TRUE);
+        }
+    }
+
+    /**
+     * Tell whether the warnings of a path are already logged or suppressed.
+     *
+     * @param path the request path, relative to the HTTP root path
+     * @return true when the path is in the logged set
+     */
+    boolean logged(String path) {
+        synchronized (captured) {
+            return logged.containsKey(path);
         }
     }
 }

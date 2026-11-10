@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -23,7 +24,6 @@ import org.jboss.logging.Logger;
 
 import io.quarkus.arc.DefaultBean;
 import org.sitenetsoft.quarkus.seo.IndexNow;
-import org.sitenetsoft.quarkus.seo.schema.JsonWriter;
 
 /**
  * Submit URLs to the IndexNow endpoint with the JDK HTTP client.
@@ -75,6 +75,19 @@ public class DefaultIndexNow implements IndexNow {
         this.siteUrl = siteUrl;
     }
 
+    /**
+     * Shut down the HTTP client without waiting for requests in flight.
+     * A submission that this cuts short is lost, as if the endpoint had failed.
+     */
+    @PreDestroy
+    void close() {
+        try {
+            client.shutdownNow();
+        } catch (RuntimeException e) {
+            LOG.debugf(e, "IndexNow client shutdown failed");
+        }
+    }
+
     @Override
     public CompletionStage<Void> submit(String... paths) {
         return submit(paths == null ? List.<String> of() : Arrays.asList(paths));
@@ -117,7 +130,7 @@ public class DefaultIndexNow implements IndexNow {
         if (urls.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
-        String file = "/" + key.key() + ".txt";
+        String file = SeoPaths.indexNowKey(key.key());
         String keyLocation = key.underRootPath() ? Urls.absolute(base, file) : Urls.hostRoot(base) + file;
         List<CompletableFuture<Void>> requests = new ArrayList<>();
         for (String body : body(host, key.key(), keyLocation, new ArrayList<>(urls))) {
@@ -169,18 +182,18 @@ public class DefaultIndexNow implements IndexNow {
         List<String> bodies = new ArrayList<>();
         for (int from = 0; from < urls.size(); from += MAX_URLS) {
             StringBuilder out = new StringBuilder("{\"host\":");
-            JsonWriter.string(out, host);
+            Json.string(out, host);
             out.append(",\"key\":");
-            JsonWriter.string(out, key);
+            Json.string(out, key);
             out.append(",\"keyLocation\":");
-            JsonWriter.string(out, keyLocation);
+            Json.string(out, keyLocation);
             out.append(",\"urlList\":[");
             int to = Math.min(urls.size(), from + MAX_URLS);
             for (int i = from; i < to; i++) {
                 if (i > from) {
                     out.append(',');
                 }
-                JsonWriter.string(out, urls.get(i));
+                Json.string(out, urls.get(i));
             }
             bodies.add(out.append("]}").toString());
         }

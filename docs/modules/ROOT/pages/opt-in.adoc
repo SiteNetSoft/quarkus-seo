@@ -42,7 +42,7 @@ xref:robots.adoc#when-your-application-serves-robotstxt[robots.txt]. The checked
 the root path.
 
 The `@SitemapEntry` paths and the ownership check include the JAX-RS prefix. An `@ApplicationPath` sets that prefix.
-Without one, `quarkus.rest.path` sets it.
+Without one, `quarkus.rest.path` sets it under Quarkus REST and `quarkus.resteasy.path` under RESTEasy Classic.
 
 == security.txt
 

@@ -1,6 +1,6 @@
 # Quarkus SEO Design
 
-**Status:** implemented (plans 1 and 2)
+**Status:** implemented (plans 1 to 3)
 **Date:** 2026-10-29
 **Deliverable:** a Quarkus extension, `org.sitenetsoft:quarkus-seo`, built with Maven. It gives an
 application meta tags, JSON-LD, a sitemap and robots.txt with almost no setup. It also offers
@@ -246,8 +246,10 @@ the designer's call.
 A higher layer replaces only the fields it sets. Setting a title does not clear the image.
 Lists such as alternates and JSON-LD nodes add to the lower layer. They do not replace it.
 
-Some fields merge as a group. The title and the absolute title are one group. The image, its size and its alt text
-are another. A layer that sets any field of a group replaces the whole group of the lower layers.
+Some fields merge as a group. The title and the absolute title are one group. A layer that sets any field of this
+group replaces the whole group of the lower layers. The image, its size and its alt text are another group, keyed on
+the image. A layer that sets the image replaces the whole group, and the fields it leaves unset become empty. A layer
+that sets only the width, the height or the alt text keeps the lower image and replaces just the fields it sets.
 
 ### 5.3 Computed values
 
@@ -344,6 +346,11 @@ The sitemap combines three sources:
 3. **Beans:** each CDI bean that implements `SitemapContributor` provides
    `Stream<SitemapUrl> urls()`. The stream is read on a worker thread and closed after use, so
    a contributor can stream from a database cursor.
+
+The path of an annotated method includes the JAX-RS prefix. Under Quarkus REST, the prefix comes
+from `@ApplicationPath` or `quarkus.rest.path`. Under RESTEasy Classic, it comes from
+`@ApplicationPath` or `quarkus.resteasy.path`. The extension reads only the key of the REST stack
+that is present.
 
 `SitemapUrl` holds:
 - `loc` (relative or absolute)
@@ -495,7 +502,7 @@ All of these are off by default. Each one has a build-time `enabled` key.
   no route, bean or filter.
 - **Application files win.** At build time the extension checks for its paths among:
   - static resources (`META-INF/resources/robots.txt` and the others)
-  - JAX-RS resource paths, with the `@ApplicationPath` or `quarkus.rest.path` prefix
+  - JAX-RS resource paths, with the `@ApplicationPath` prefix or the REST path key of the stack in use
   - Reactive Routes paths
 
   If the application has any of them, the extension does not register its own route for that

@@ -33,10 +33,6 @@ import org.sitenetsoft.quarkus.seo.runtime.devui.SeoJsonRpcService;
  */
 @BuildSteps(onlyIf = IsLocalDevelopment.class)
 public class SeoDevUiProcessor {
-
-    private static final String ROBOTS_PATH = "/robots.txt";
-    private static final String SECURITY_TXT_PATH = "/.well-known/security.txt";
-    private static final String LLMS_TXT_PATH = "/llms.txt";
     private static final String EXTENSION = "extension";
     private static final String APPLICATION = "application";
     private static final String OFF = "off";
@@ -162,21 +158,23 @@ public class SeoDevUiProcessor {
                 .getOptionalValue("quarkus.http.root-path", String.class).orElse("/"));
         String sitemapPath = SeoPaths.normalize(config.sitemap().path());
         String manifestPath = SeoPaths.normalize(config.manifest().path());
-        String indexNowPath = config.indexNow().key().isPresent() ? "/" + config.indexNow().key().get() + ".txt" : "";
+        String indexNowPath = config.indexNow().key().isPresent()
+                ? SeoPaths.indexNowKey(config.indexNow().key().get())
+                : "";
         List<Map<String, String>> rows = new ArrayList<>();
         rows.add(row("meta", "", outputs.meta() ? EXTENSION : OFF));
         rows.add(row("sitemap", rootPath + sitemapPath, servedBy(outputs.sitemap(), outputs, sitemapPath)));
-        rows.add(row("robots.txt", hostRoot(rootPath, config.robots().serveUnderRootPath()) + ROBOTS_PATH,
-                servedBy(outputs.robots(), outputs, ROBOTS_PATH)));
+        rows.add(row("robots.txt", hostRoot(rootPath, config.robots().serveUnderRootPath()) + SeoPaths.ROBOTS_TXT,
+                servedBy(outputs.robots(), outputs, SeoPaths.ROBOTS_TXT)));
         rows.add(row("security.txt",
-                hostRoot(rootPath, config.securityTxt().serveUnderRootPath()) + SECURITY_TXT_PATH,
-                servedBy(outputs.securityTxt(), outputs, SECURITY_TXT_PATH)));
+                hostRoot(rootPath, config.securityTxt().serveUnderRootPath()) + SeoPaths.SECURITY_TXT,
+                servedBy(outputs.securityTxt(), outputs, SeoPaths.SECURITY_TXT)));
         rows.add(row("manifest", rootPath + manifestPath, servedBy(outputs.manifest(), outputs, manifestPath)));
         rows.add(row("IndexNow key",
                 indexNowPath.isEmpty() ? "" : hostRoot(rootPath, config.indexNow().serveUnderRootPath()) + indexNowPath,
                 indexNowPath.isEmpty() ? OFF : servedBy(outputs.indexNow(), outputs, indexNowPath)));
-        rows.add(row("llms.txt", hostRoot(rootPath, config.llmsTxt().serveUnderRootPath()) + LLMS_TXT_PATH,
-                servedBy(outputs.llmsTxt(), outputs, LLMS_TXT_PATH)));
+        rows.add(row("llms.txt", hostRoot(rootPath, config.llmsTxt().serveUnderRootPath()) + SeoPaths.LLMS_TXT,
+                servedBy(outputs.llmsTxt(), outputs, SeoPaths.LLMS_TXT)));
         return rows;
     }
 
