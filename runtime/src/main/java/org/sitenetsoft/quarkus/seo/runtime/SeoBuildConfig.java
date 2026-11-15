@@ -92,6 +92,17 @@ public interface SeoBuildConfig {
          */
         @WithDefault("true")
         boolean enabled();
+
+        /**
+         * Choose what happens when the application or another extension, such as Roq, already has a {@code seo} tag,
+         * that is a {@code templates/tags/seo.*} template. With {@code step-aside}, the extension registers no
+         * {@code {#seo}} tag, {@code seo} namespace, {@code Seo} bean or X-Robots-Tag filter, and does not provide its
+         * capability. With {@code take-over}, its tag replaces the other one.
+         *
+         * @return what the meta feature does on a conflict
+         */
+        @WithDefault("step-aside")
+        OnConflict onConflict();
     }
 
     /**
@@ -136,6 +147,26 @@ public interface SeoBuildConfig {
          */
         @WithDefault("/sitemap-{n}.xml")
         String pagePath();
+
+        /**
+         * Choose what happens when Roq's sitemap plugin is on the class path. Roq then serves its own sitemap with its
+         * own pages. With {@code step-aside}, the extension registers no sitemap route. With {@code take-over}, its
+         * sitemap replaces Roq's and lists no Roq pages.
+         *
+         * @return what the sitemap feature does on a conflict
+         */
+        @WithDefault("step-aside")
+        OnConflict onConflict();
+    }
+
+    /**
+     * Choose what a feature does when something else in the application already provides it.
+     */
+    enum OnConflict {
+        /** Leave the feature to the other provider. */
+        STEP_ASIDE,
+        /** Register the feature anyway, in place of the other provider. */
+        TAKE_OVER
     }
 
     /**

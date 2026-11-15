@@ -1,6 +1,6 @@
 # Quarkus SEO Design
 
-**Status:** implemented (plans 1 to 3)
+**Status:** implemented (plans 1 to 3, and the Roq conflict rules of 2026-11-14)
 **Date:** 2026-10-29
 **Deliverable:** a Quarkus extension, `org.sitenetsoft:quarkus-seo`, built with Maven. It gives an
 application meta tags, JSON-LD, a sitemap and robots.txt with almost no setup. It also offers
@@ -160,6 +160,7 @@ conflict check in §10 see them. Changing a path needs a rebuild. This is the de
 | `quarkus.seo.theme-color` | none | `theme-color`. |
 | `quarkus.seo.canonical.keep-query-params` | empty | The query parameters kept in canonical URLs. All others are removed. |
 | `quarkus.seo.meta.enabled` (build time) | `true` | The `{#seo}` tag, the `Seo` bean and the X-Robots-Tag filter. |
+| `quarkus.seo.meta.on-conflict` (build time) | `step-aside` | What the meta feature does when another `seo` tag exists. See §10. |
 | `quarkus.seo.json-ld.enabled` (build time) | `true` | JSON-LD output in `{#seo}`. |
 | `quarkus.seo.organization.*` | none | Site-wide Organization JSON-LD: name, url, logo, same-as list. |
 
@@ -395,6 +396,7 @@ cache. Its ETag and Cache-Control header still apply.
 ### 7.4 Switches
 
 - `quarkus.seo.sitemap.enabled` (build time) is `true` by default.
+- `quarkus.seo.sitemap.on-conflict` (build time) is `step-aside` by default. See §10.
 - When `indexable` is false, the sitemap is still served, but robots.txt does not list it.
 
 ## 8. robots.txt
@@ -507,6 +509,24 @@ All of these are off by default. Each one has a build-time `enabled` key.
 
   If the application has any of them, the extension does not register its own route for that
   path. It logs nothing in prod, and the Dev UI shows which outputs the application owns.
+- **Other providers of the same feature.** Two features can meet another provider that the path
+  check cannot see. Each has a build-time rule, `step-aside` (the default) or `take-over`:
+  - `quarkus.seo.meta.on-conflict`: another `seo` tag exists, that is a `templates/tags/seo.*`
+    template in the application or in a dependency, such as Roq's. With `step-aside`, the
+    extension registers no `{#seo}` tag, `seo:` namespace, `Seo` bean or X-Robots-Tag filter, and
+    does not provide its capability, and the Dev UI shows the meta feature as owned by the
+    application. With `take-over`, it hides the other `tags/seo` templates
+    from Qute, so its own tag wins. Qute would otherwise pick a winner by where each tag comes
+    from.
+  - `quarkus.seo.sitemap.on-conflict`: Roq's sitemap plugin, `quarkus-roq-plugin-sitemap`, is on
+    the class path. Roq then serves its own sitemap with its own pages, which this extension cannot
+    list. A Roq site without the plugin keeps this extension's sitemap. With `step-aside`, the extension registers
+    no sitemap route and the Dev UI shows the sitemap as owned by the application. robots.txt
+    still lists the sitemap path. With `take-over`, the extension's sitemap replaces Roq's.
+
+  Roq declares no capability, so the build looks for the plugin's class
+  `io.quarkiverse.roq.plugin.sitemap.runtime.RoqSitemapKeys` on the class path. That is a name check,
+  with no dependency on Roq.
 - **Sitemap entry paths:** the same JAX-RS prefix applies to the paths of `@SitemapEntry` methods.
 - **Routes:** the extension registers plain Vert.x routes through `RouteBuildItem`, not JAX-RS
   resources. JAX-RS needs a constant `@Path`, which is why quarkus-tus cannot move its endpoints.
@@ -529,7 +549,8 @@ capabilities:
    `Capabilities.isPresent("org.sitenetsoft.seo")`. That is a string check, with no dependency on
    quarkus-seo.
 3. The extension that knows the other one does the integration. quarkus-seo knows nothing about
-   them.
+   them. The one exception is Roq, which declares no capability: quarkus-seo checks for a Roq class
+   by name to avoid a conflict (§10).
 
 The public contract that other extensions may rely on is:
 - the `{#seo}` tag and its parameter names
@@ -656,6 +677,8 @@ The README follows the quarkus-microformats layout.
 - Do not assume a known proxy.
 - Every feature is optional.
 - No dependencies between extensions, but plug-and-play integration.
+- With Roq or another `seo` tag in the application, step aside by default, with a per-feature
+  `on-conflict` key to take over instead (2026-11-14).
 
 **By the designer (the user can still change these):**
 - Maven, Quarkus 3.40.1, release 21.

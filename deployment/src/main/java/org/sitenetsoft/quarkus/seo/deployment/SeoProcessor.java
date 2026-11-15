@@ -20,6 +20,7 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
+import io.quarkus.qute.deployment.TemplatePathExcludeBuildItem;
 import io.quarkus.vertx.http.deployment.FilterBuildItem;
 import io.quarkus.vertx.http.deployment.NonApplicationRootPathBuildItem;
 import io.quarkus.vertx.http.deployment.RouteBuildItem;
@@ -48,6 +49,7 @@ import org.sitenetsoft.quarkus.seo.runtime.SeoLayers;
 import org.sitenetsoft.quarkus.seo.runtime.SeoPaths;
 import org.sitenetsoft.quarkus.seo.runtime.SeoRecorder;
 import org.sitenetsoft.quarkus.seo.runtime.SeoResolver;
+import org.sitenetsoft.quarkus.seo.runtime.SeoBuildConfig.OnConflict;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSectionHelperFactory;
 import org.sitenetsoft.quarkus.seo.runtime.SeoSettings;
 import org.sitenetsoft.quarkus.seo.runtime.SeoTemplateExtensions;
@@ -85,6 +87,10 @@ class SeoProcessor {
      * {@code @ApplicationPath} or REST path prefix. The step treats every match on a host-root path
      * as owned, whatever the root path. The host-root paths are {@code /robots.txt}, {@code /.well-known/security.txt},
      * the IndexNow key file and {@code /llms.txt}. The step logs nothing about owned paths.
+     *
+     * <p>
+     * With the default {@code on-conflict} rule, the meta feature is off when another {@code seo} tag exists, and the
+     * sitemap is off and counted as owned when Roq is present. See {@link SeoConflicts}.
      *
      * @param config the build-time configuration
      * @param index the combined index
@@ -134,14 +140,33 @@ class SeoProcessor {
                 owned.add(path);
             }
         }
+        if (config.sitemap().enabled() && SeoConflicts.sitemapStepsAside(config)) {
+            owned.add(sitemapPath);
+        }
         boolean sitemap = config.sitemap().enabled() && !owned.contains(sitemapPath);
         boolean robots = config.robots().enabled() && !owned.contains(SeoPaths.ROBOTS_TXT);
         boolean securityTxt = config.securityTxt().enabled() && !owned.contains(SeoPaths.SECURITY_TXT);
         boolean manifest = config.manifest().enabled() && !owned.contains(manifestPath);
         boolean indexNow = config.indexNow().enabled() && !owned.contains(indexNowKeyPath);
         boolean llmsTxt = config.llmsTxt().enabled() && !owned.contains(SeoPaths.LLMS_TXT);
-        return new SeoOutputsBuildItem(config.meta().enabled(), sitemap, robots, securityTxt, manifest, indexNow,
+        boolean meta = new SeoMetaEnabled(config).getAsBoolean();
+        return new SeoOutputsBuildItem(meta, sitemap, robots, securityTxt, manifest, indexNow,
                 llmsTxt, indexNowKeyPath, owned);
+    }
+
+    /**
+     * Hide every other {@code seo} tag when the meta feature takes over, so that Qute uses the extension's tag. Without
+     * this, a {@code templates/tags/seo.*} template of the application or of another extension would win.
+     *
+     * @param config the build-time configuration
+     * @return the exclusion, or null when the meta feature does not take over
+     */
+    @BuildStep
+    TemplatePathExcludeBuildItem takeOverSeoTag(SeoBuildConfig config) {
+        if (!config.enabled() || !config.meta().enabled() || config.meta().onConflict() != OnConflict.TAKE_OVER) {
+            return null;
+        }
+        return new TemplatePathExcludeBuildItem(SeoConflicts.SEO_TAG_PATHS);
     }
 
     /**

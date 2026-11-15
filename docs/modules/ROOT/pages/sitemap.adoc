@@ -131,6 +131,22 @@ sees static files, JAX-RS paths and Reactive Routes. A JAX-RS path includes the 
 REST path prefix. The limits on the `robots.txt` page apply here too. See
 xref:robots.adoc#when-your-application-serves-robotstxt[When your application serves robots.txt].
 
+== When Roq is present
+
+Roq's sitemap plugin, `quarkus-roq-plugin-sitemap`, serves a sitemap with Roq's pages, and this extension cannot list
+them. When the plugin is on the class path, the extension therefore serves no sitemap by default. A Roq site without
+the plugin keeps this extension's sitemap. The Dev UI shows the sitemap as owned by the application. robots.txt
+still lists the sitemap path, where Roq serves it.
+
+To serve this extension's sitemap instead, set the build-time key:
+
+[source,properties]
+----
+quarkus.seo.sitemap.on-conflict=take-over
+----
+
+The sitemap then lists `@SitemapEntry` methods and contributors only, not Roq's pages.
+
 == Switch the feature off
 
 Set `quarkus.seo.sitemap.enabled=false` at build time. The extension then registers no sitemap route.
