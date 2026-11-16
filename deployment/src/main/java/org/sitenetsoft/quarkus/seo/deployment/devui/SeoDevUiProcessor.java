@@ -162,7 +162,7 @@ public class SeoDevUiProcessor {
                 ? SeoPaths.indexNowKey(config.indexNow().key().get())
                 : "";
         List<Map<String, String>> rows = new ArrayList<>();
-        rows.add(row("meta", "", outputs.meta() ? EXTENSION : OFF));
+        rows.add(row("meta", "", outputs.meta() ? EXTENSION : config.meta().enabled() ? APPLICATION : OFF));
         rows.add(row("sitemap", rootPath + sitemapPath, servedBy(outputs.sitemap(), outputs, sitemapPath)));
         rows.add(row("robots.txt", hostRoot(rootPath, config.robots().serveUnderRootPath()) + SeoPaths.ROBOTS_TXT,
                 servedBy(outputs.robots(), outputs, SeoPaths.ROBOTS_TXT)));

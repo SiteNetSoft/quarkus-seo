@@ -236,6 +236,25 @@ example, with the root path `/app`, set `quarkus.seo.site-url=https://example.or
 * The extension writes the tags in a fixed order, one tag per line.
 * The extension does not write `<meta charset>`, `viewport` or favicon links. Your layout owns them.
 
+== When another seo tag exists
+
+Another extension or your application may already have a Qute tag named `seo`: a `templates/tags/seo.*` template.
+Roq is one example. Its layouts call `{#seo page site /}`. By default, the extension then steps aside. It registers no
+`{#seo}` tag, no `seo:` namespace, no `Seo` bean and no X-Robots-Tag filter, and it drops the capability
+`org.sitenetsoft.seo`. The other tag works as before. The sitemap, robots.txt and the other outputs still work. The
+Dev UI shows the meta feature as owned by the application.
+
+To use this extension's tag instead, set the build-time key:
+
+[source,properties]
+----
+quarkus.seo.meta.on-conflict=take-over
+----
+
+The extension then hides every other `tags/seo` template from Qute, so `{#seo}` is always its own tag. Any template
+that calls the other tag with that tag's parameters then fails the build. With Roq, replace Roq's layouts with your own
+first.
+
 == Switch the feature off
 
 Set `quarkus.seo.meta.enabled=false` at build time. The extension then registers no `{#seo}` tag, no `seo:`

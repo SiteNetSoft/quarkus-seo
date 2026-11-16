@@ -21,12 +21,13 @@ public class SeoMetaEnabled implements BooleanSupplier {
     }
 
     /**
-     * Tell whether the master switch and the meta switch are both on.
+     * Tell whether the master switch and the meta switch are both on, and the meta feature does not step aside for
+     * another {@code seo} tag.
      *
      * @return true when the {@code {#seo}} tag, the {@code seo} namespace and the {@code Seo} bean exist
      */
     @Override
     public boolean getAsBoolean() {
-        return config.enabled() && config.meta().enabled();
+        return config.enabled() && config.meta().enabled() && !SeoConflicts.metaStepsAside(config);
     }
 }
